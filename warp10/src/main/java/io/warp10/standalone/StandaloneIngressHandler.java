@@ -95,6 +95,26 @@ public class StandaloneIngressHandler extends AbstractHandler {
   private final byte[] labelsKey;  
   
   /**
+   * Array of modulus for the shards we handle
+   */
+  private final long[] shardModulus;
+  
+  /**
+   * Array of remainder for the shards we handle
+   */
+  private final long[] shardRemainder;
+  
+  /**
+   * Flag indicating whether or not to log all shards
+   */
+  private final boolean logAllShards;
+  
+  /**
+   * Flag indicating whether or not to log the shard id for each line
+   */
+  private final boolean logShard;
+  
+  /**
    * Key to wrap the token in the file names
    */
   private final byte[] datalogPSK;
@@ -124,6 +144,41 @@ public class StandaloneIngressHandler extends AbstractHandler {
     this.labelsKeyLongs = SipHashInline.getKey(this.labelsKey);
     
     Properties props = WarpConfig.getProperties();
+    
+    if (props.containsKey(Configuration.STANDALONE_SHARDS)) {
+      String[] tokens = props.getProperty(Configuration.STANDALONE_SHARDS).split(",");
+      
+      int shardCount = tokens.length;
+      
+      this.shardModulus = new long[shardCount];
+      this.shardRemainder = new long[shardCount];
+      
+      for (int i = 0; i < shardCount; i++) {
+        String[] subtokens = tokens[i].trim().split(":");
+        
+        long modulus = Long.parseLong(subtokens[0]);
+        long remainder = Long.parseLong(subtokens[1]);
+        
+        if (remainder >= modulus || modulus <= 0 || remainder < 0) {
+          throw new RuntimeException("Invalid modulus:remainder pair " + tokens[i]);
+        }
+        
+        shardModulus[i] = modulus;
+        shardRemainder[i] = remainder;
+      }
+      
+      if ("true".equals(props.getProperty(Configuration.DATALOG_ONLY_LOG_SHARDS))) {
+        this.logAllShards = false;
+      } else {
+        this.logAllShards = true;
+      }
+    } else {
+      this.shardModulus = null;
+      this.shardRemainder = null;
+      this.logAllShards = true;
+    }
+    
+    this.logShard = "true".equals(props.getProperty(Configuration.DATALOG_LOGSHARD));
     
     if (props.containsKey(Configuration.DATALOG_DIR)) {
       File dir = new File(props.getProperty(Configuration.DATALOG_DIR));
@@ -438,9 +493,11 @@ public class StandaloneIngressHandler extends AbstractHandler {
       GTSEncoder lastencoder = null;
       GTSEncoder encoder = null;
       
-      //
-      // Chunk index when archiving
-      //
+      boolean logLine = false;
+      long lineRemainder = Long.MIN_VALUE;
+      long lineModulus = 0;
+      
+      GTSEncoder lastLoggedEncoder = null;
       
       do {
         
@@ -491,14 +548,39 @@ public class StandaloneIngressHandler extends AbstractHandler {
           // Check throttling
           //
           
+          boolean keepLastEncoder = true;
+          
           if (null != lastencoder) {
             
             // 128BITS
             lastencoder.setClassId(GTSHelper.classId(classKeyLongs, lastencoder.getName()));
             lastencoder.setLabelsId(GTSHelper.labelsId(labelsKeyLongs, lastencoder.getMetadata().getLabels()));
 
-            ThrottlingManager.checkMADS(lastencoder.getMetadata(), producer, owner, application, lastencoder.getClassId(), lastencoder.getLabelsId());
-            ThrottlingManager.checkDDP(lastencoder.getMetadata(), producer, owner, application, (int) lastencoder.getCount());
+            //
+            // If we are sharded, check if the encoder shoud be considered
+            //
+            
+            boolean keep = true;
+            
+            if (null != this.shardModulus) {
+              keep = false;
+              
+              long shardkey = lastencoder.getLabelsId() >>> 8;
+              
+              for (int i = 0; i < this.shardModulus.length; i++) {
+                if (shardkey % this.shardModulus[i] == this.shardRemainder[i]) {
+                  keep = true;
+                  break;
+                }
+              }
+            }
+          
+            keepLastEncoder = keep;
+            
+            if (keep) {
+              ThrottlingManager.checkMADS(lastencoder.getMetadata(), producer, owner, application, lastencoder.getClassId(), lastencoder.getLabelsId());
+              ThrottlingManager.checkDDP(lastencoder.getMetadata(), producer, owner, application, (int) lastencoder.getCount());
+            }
           }
           
           //
@@ -508,13 +590,28 @@ public class StandaloneIngressHandler extends AbstractHandler {
           if (encoder != lastencoder) {
             Metadata metadata = new Metadata(encoder.getMetadata());
             metadata.setSource(Configuration.INGRESS_METADATA_SOURCE);
-            //nano6 += System.nanoTime() - nano0;
-            this.directoryClient.register(metadata);
-            //nano5 += System.nanoTime() - nano0;
-          }
 
+            boolean keep = true;
+            
+            if (null != this.shardModulus) {
+              keep = false;
+              
+              long shardKey = GTSHelper.labelsId(labelsKeyLongs, encoder.getMetadata().getLabels()) >>> 8;
+              
+              for (int i = 0; i < this.shardModulus.length; i++) {
+                if (shardKey % this.shardModulus[i] == this.shardRemainder[i]) {
+                  keep = true;
+                  break;
+                }
+              }
+            }
+            
+            if (keep) {
+              this.directoryClient.register(metadata);
+            }
+          }
           
-          if (null != lastencoder) {
+          if (null != lastencoder && keepLastEncoder) {
             this.storeClient.store(lastencoder);              
           }
 
@@ -537,7 +634,40 @@ public class StandaloneIngressHandler extends AbstractHandler {
         //
         
         if (null != loggingWriter) {
-          loggingWriter.println(line);
+          // If logging all shards or no sharding, log line
+          if (logAllShards || null == this.shardModulus) {
+            loggingWriter.println(line);
+          } else {
+            // If the last line we logged was not for this encoder, recompute logLine
+            if (lastLoggedEncoder != encoder) {
+              logLine = false;
+              lineRemainder = Long.MIN_VALUE;
+              
+              long shardKey = GTSHelper.labelsId(labelsKeyLongs, encoder.getMetadata().getLabels()) >>> 8;
+                
+              for (int i = 0; i < this.shardModulus.length; i++) {
+                lineRemainder = shardKey % this.shardModulus[i]; 
+                if (lineRemainder == this.shardRemainder[i]) {
+                  lineModulus = this.shardModulus[i];
+                  logLine = true;
+                  break;
+                }
+              }
+              
+              lastLoggedEncoder = encoder;
+            }
+            
+            if (logLine) {
+              if (lineRemainder >= 0 && this.logShard) {
+                loggingWriter.print('#');
+                loggingWriter.print(lineModulus);
+                loggingWriter.print(':');
+                loggingWriter.print(lineRemainder);
+                loggingWriter.print(' ');
+              }
+              loggingWriter.println(line);              
+            }
+          }
         }
       } while (true); 
       
@@ -548,9 +678,26 @@ public class StandaloneIngressHandler extends AbstractHandler {
         lastencoder.setClassId(GTSHelper.classId(classKeyLongs, lastencoder.getName()));
         lastencoder.setLabelsId(GTSHelper.labelsId(labelsKeyLongs, lastencoder.getMetadata().getLabels()));
                 
-        ThrottlingManager.checkMADS(lastencoder.getMetadata(), producer, owner, application, lastencoder.getClassId(), lastencoder.getLabelsId());
-        ThrottlingManager.checkDDP(lastencoder.getMetadata(), producer, owner, application, (int) lastencoder.getCount());
-        this.storeClient.store(lastencoder);
+        boolean keep = true;
+        
+        if (null != this.shardModulus) {
+          keep = false;
+          
+          long shardkey = lastencoder.getLabelsId() >>> 8;
+          
+          for (int i = 0; i < this.shardModulus.length; i++) {
+            if (shardkey % this.shardModulus[i] == this.shardRemainder[i]) {
+              keep = true;
+              break;
+            }
+          }
+        }
+
+        if (keep) {
+          ThrottlingManager.checkMADS(lastencoder.getMetadata(), producer, owner, application, lastencoder.getClassId(), lastencoder.getLabelsId());
+          ThrottlingManager.checkDDP(lastencoder.getMetadata(), producer, owner, application, (int) lastencoder.getCount());
+          this.storeClient.store(lastencoder);          
+        }
       }        
       
       //

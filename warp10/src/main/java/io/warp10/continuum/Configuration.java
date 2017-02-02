@@ -1235,6 +1235,22 @@ public class Configuration {
   public static final String STANDALONE_SNAPSHOT_SIGNAL = "standalone.snapshot.signal";
   
   /**
+   * Comma separated list of shards (modulus:remainder) this instance should manage
+   */
+  public static final String STANDALONE_SHARDS = "standalone.shards";
+  
+  /**
+   * Set to true to only log lines pertaining to shards the instance handles, defaults to false (i.e. log everything)
+   */
+  public static final String DATALOG_ONLY_LOG_SHARDS = "datalog.onlylogshards";
+  
+  /**
+   * Set to true to prefix all logged lines with '#modulus:remainder' of the matching shard.
+   * This has an effect only if onlylogshards is set to 'true'.
+   */
+  public static final String DATALOG_LOGSHARD = "datalog.logshard";
+  
+  /**
    * Directory where data requests should be logged. This directory should be in 700 to protect sensitive token infos.
    */
   public static final String DATALOG_DIR = "datalog.dir";
@@ -1261,10 +1277,23 @@ public class Configuration {
   public static final String HTTP_HEADER_DATALOG = "http.header.datalog";
   
   /**
+   * Comma separated list of forwarder names, an instance of forwarder will be
+   * created for each listed name and each will look at properties ending in ".name"
+   * for its configuration.
+   */
+  public static final String DATALOG_FORWARDERS = "datalog.forwarders";
+  
+  /**
    * Comma separated list of ids which should be ignored by the forwarder. This is to prevent loops from
    * forming.
    */
   public static final String DATALOG_FORWARDER_IGNORED = "datalog.forwarder.ignored";
+  
+  /**
+   * Comma separated list of shards (modulus:remainder) to forward. This assumes the datalog files
+   * have the shard specified as a prefix (#modulus:remainder ), as set when datalog.logshard and datalog.onlylogshards are specified.
+   */
+  public static final String DATALOG_FORWARDER_SHARDS = "datalog.forwarder.shards";
   
   /**
    * Directory from which to read the datalog files to forward

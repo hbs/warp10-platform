@@ -1,8 +1,25 @@
+//
+//   Copyright 2016  Cityzen Data
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+
 package io.warp10.continuum.ingress;
 
 import io.warp10.SortedPathIterator;
 import io.warp10.continuum.Configuration;
 import io.warp10.continuum.Tokens;
+import io.warp10.continuum.gts.UnsafeString;
 import io.warp10.continuum.sensision.SensisionConstants;
 import io.warp10.continuum.store.Constants;
 import io.warp10.continuum.store.thrift.data.DatalogRequest;
@@ -32,7 +49,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.LockSupport;
 import java.util.zip.GZIPOutputStream;
 
@@ -118,6 +134,11 @@ public class DatalogForwarder extends Thread {
    * Flag to indicate whether or not to delete ignored requests
    */
   private final boolean deleteIgnored;
+  
+  /**
+   * Set of shards we forward
+   */
+  private final Set<String> shards = new HashSet<String>();
   
   public static enum DatalogActionType {
     UPDATE,
@@ -253,6 +274,8 @@ public class DatalogForwarder extends Thread {
                 
         boolean first = true;
         
+        boolean hasShards = !forwarder.shards.isEmpty();
+        
         while(true) {
           String line = br.readLine();
           if (null == line) {
@@ -263,7 +286,23 @@ public class DatalogForwarder extends Thread {
             first = false;
             continue;
           }
-          pw.println(line);
+          if (!hasShards) {
+            pw.println(line);
+          } else {
+            // Check the shard and only emit the line if it is in a shard
+            // we forward
+            if ('#' != line.charAt(0)) {
+              throw new IOException("Missing shard at line " + line);
+            }
+            char[] chars = UnsafeString.getChars(line);
+            int space = UnsafeString.indexOf(line, ' ');
+            String shard = new String(chars, 1, space - 1);
+            
+            if (forwarder.shards.contains(shard)) {
+              pw.write(chars, space + 1, chars.length - space - 1);
+              pw.write('\n');
+            }
+          }
         }
         
         pw.close();
@@ -453,61 +492,77 @@ public class DatalogForwarder extends Thread {
     
   }
   
+  private final String suffix;
+  
   public DatalogForwarder(KeyStore keystore, Properties properties) throws Exception {
+    this(null, keystore, properties);
+  }
+  
+  public DatalogForwarder(String name, KeyStore keystore, Properties properties) throws Exception {
     
-    this.rootdir = new File(properties.getProperty(Configuration.DATALOG_FORWARDER_SRCDIR)).toPath();
+    this.suffix = null == name ? "" : ("." + name);
     
-    if (properties.containsKey(Configuration.DATALOG_PSK)) {
-      this.datalogPSK = keystore.decodeKey(properties.getProperty(Configuration.DATALOG_PSK));
+    this.rootdir = new File(properties.getProperty(Configuration.DATALOG_FORWARDER_SRCDIR + this.suffix)).toPath();
+    
+    if (properties.containsKey(Configuration.DATALOG_PSK + this.suffix)) {
+      this.datalogPSK = keystore.decodeKey(properties.getProperty(Configuration.DATALOG_PSK + this.suffix));
     } else {
       this.datalogPSK = null;
     }
     
-    this.period = Long.parseLong(properties.getProperty(Configuration.DATALOG_FORWARDER_PERIOD, DEFAULT_PERIOD));
+    this.period = Long.parseLong(properties.getProperty(Configuration.DATALOG_FORWARDER_PERIOD + this.suffix, DEFAULT_PERIOD));
     
-    this.compress = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_COMPRESS));
+    this.compress = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_COMPRESS + this.suffix));
     
-    this.actasclient = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_ACTASCLIENT));
+    this.actasclient = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_ACTASCLIENT + this.suffix));
     
     this.ignoredIds = new HashSet<String>();
     
-    if (properties.containsKey(Configuration.DATALOG_FORWARDER_IGNORED)) {
-      String[] ids = properties.getProperty(Configuration.DATALOG_FORWARDER_IGNORED).split(",");
+    if (properties.containsKey(Configuration.DATALOG_FORWARDER_IGNORED + this.suffix)) {
+      String[] ids = properties.getProperty(Configuration.DATALOG_FORWARDER_IGNORED + this.suffix).split(",");
       
       for (String id: ids) {
         ignoredIds.add(id.trim());
       }
     }
     
-    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_DSTDIR)) {
-      throw new RuntimeException("Datalog forwarder target directory (" +  Configuration.DATALOG_FORWARDER_DSTDIR + ") not set.");
+    if (properties.containsKey(Configuration.DATALOG_FORWARDER_SHARDS + this.suffix)) {
+      String[] tokens = properties.getProperty(Configuration.DATALOG_FORWARDER_SHARDS + this.suffix).split(",");
+      
+      for (String token: tokens) {
+        this.shards.add(token.trim());
+      }
+    }
+    
+    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_DSTDIR + this.suffix)) {
+      throw new RuntimeException("Datalog forwarder target directory (" +  Configuration.DATALOG_FORWARDER_DSTDIR + this.suffix + ") not set.");
     }
 
-    this.targetDir = new File(properties.getProperty(Configuration.DATALOG_FORWARDER_DSTDIR));
+    this.targetDir = new File(properties.getProperty(Configuration.DATALOG_FORWARDER_DSTDIR + this.suffix));
 
     if (!this.targetDir.isDirectory()) {
       throw new RuntimeException("Invalid datalog forwarder target directory.");
     }
     
-    this.deleteForwarded = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_DELETEFORWARDED));
-    this.deleteIgnored = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_DELETEIGNORED));
+    this.deleteForwarded = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_DELETEFORWARDED + this.suffix));
+    this.deleteIgnored = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_DELETEIGNORED + this.suffix));
     
-    int nthreads = Integer.parseInt(properties.getProperty(Configuration.DATALOG_FORWARDER_NTHREADS, "1"));
+    int nthreads = Integer.parseInt(properties.getProperty(Configuration.DATALOG_FORWARDER_NTHREADS + this.suffix, "1"));
     
-    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_UPDATE)) {
+    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_UPDATE + this.suffix)) {
       throw new RuntimeException("Missing UPDATE endpoint.");
     }
-    this.updateUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_UPDATE));
+    this.updateUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_UPDATE + this.suffix));
 
-    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_DELETE)) {
+    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_DELETE + this.suffix)) {
       throw new RuntimeException("Missing DELETE endpoint.");
     }
-    this.deleteUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_DELETE));
+    this.deleteUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_DELETE + this.suffix));
 
-    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_META)) {
+    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_META + this.suffix)) {
       throw new RuntimeException("Missing META endpoint.");
     }
-    this.metaUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_META));
+    this.metaUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_META + this.suffix));
 
     queues = new LinkedBlockingDeque[nthreads];
     
