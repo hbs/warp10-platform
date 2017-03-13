@@ -1317,6 +1317,11 @@ public class Configuration {
   public static final String DATALOG_FORWARDERS = "datalog.forwarders";
   
   /**
+   * Comma separated list of shards to forward or the name 'all' to forward them all
+   */
+  public static final String DATALOG_FORWARDER_SHARDS = "datalog.forwarder.shards";
+  
+  /**
    * Directory from which to read the datalog files to forward
    */
   public static final String DATALOG_FORWARDER_SRCDIR = "datalog.forwarder.srcdir";

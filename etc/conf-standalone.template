@@ -472,6 +472,7 @@ quantum.host = ${standalone.host}
 // selecting shards to forward
 //
 #datalog.shardkey = false
+
 //
 // Unique id for this datalog instance.
 //
@@ -488,6 +489,19 @@ quantum.host = ${standalone.host}
 // forward them to an additional hop.
 //
 #datalog.logforwarded = false
+
+//
+// Optional comma separated list of forwarder names. If this is set, then the configuration of each forwarder
+// is expected to be in the datalog.forwarder.*.NAME properties, where NAME is the name of the forwarder.
+//
+#datalog.forwarders = 
+
+//
+// Optional list of shards to be forwarded by a given forwarder. The list is comma separated and each element
+// has the form MODULUS:REMAINDER.
+// A special value of 'all' for this property means that all shards should be forwarded.
+//
+#datalog.forwarder.shards =
 
 //
 // Directory where datalog files to forward reside. If this property and 'datalog.forwarder.dstdir' are set, then

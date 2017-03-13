@@ -3,6 +3,7 @@ package io.warp10.continuum.ingress;
 import io.warp10.SortedPathIterator;
 import io.warp10.continuum.Configuration;
 import io.warp10.continuum.Tokens;
+import io.warp10.continuum.gts.UnsafeString;
 import io.warp10.continuum.sensision.SensisionConstants;
 import io.warp10.continuum.store.Constants;
 import io.warp10.continuum.store.thrift.data.DatalogRequest;
@@ -119,7 +120,25 @@ public class DatalogForwarder extends Thread {
    */
   private final boolean deleteIgnored;
   
+  /**
+   * Suffix for the configuration properties
+   */
   private final String suffix;
+  
+  /**
+   * Moduli to use for the shards
+   */
+  private final long[] modulus;
+  
+  /**
+   * Associated remainder for each shard
+   */
+  private final long[] remainder;
+  
+  /**
+   * Flag indicating that we should consider all shards when forwarding
+   */
+  private final boolean allShards;
   
   public static enum DatalogActionType {
     UPDATE,
@@ -265,6 +284,37 @@ public class DatalogForwarder extends Thread {
             first = false;
             continue;
           }
+          // If shards are defined, check the shard key
+          if (forwarder.allShards || (null != forwarder.modulus && null != forwarder.remainder)) {
+            if ('#' == line.charAt(0)) {
+              int wspidx = line.indexOf(' ', 1);
+              
+              if (forwarder.allShards) {
+                pw.write(UnsafeString.getChars(line), wspidx + 1, line.length() - wspidx - 1);
+                pw.println();
+                continue;
+              }
+        
+              // Extract the shard key
+              long shardkey = Long.parseLong(line.substring(1,wspidx));
+              
+              // Check if one shard matches, in which case we print out the line and continue
+              for (int i = 0; i < forwarder.modulus.length; i++) {
+                if (shardkey % forwarder.modulus[i] == forwarder.remainder[i]) {
+                  pw.write(UnsafeString.getChars(line), wspidx + 1, line.length() - wspidx - 1);
+                  pw.println();
+                  break;
+                }
+              }
+              continue;
+            } else {
+              // Ignore line if shard is not present and we are not forwarding everything
+              if (!forwarder.allShards) {
+                continue;
+              }
+            }
+          }
+          
           pw.println(line);
         }
         
@@ -517,6 +567,40 @@ public class DatalogForwarder extends Thread {
     }
     this.metaUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_META + this.suffix));
 
+    if (properties.containsKey(Configuration.DATALOG_FORWARDER_SHARDS + this.suffix)) {
+      String[] shards = properties.getProperty(Configuration.DATALOG_FORWARDER_SHARDS + this.suffix).split(",");
+      
+      if (1 == shards.length && "all".equals(shards)) {
+        this.modulus = null;
+        this.remainder = null;
+        this.allShards = true;
+      } else {
+        this.allShards = false;
+        this.modulus = new long[shards.length];
+        this.remainder = new long[shards.length];
+        
+        int idx = 0;
+        
+        for (String shard: shards) {
+          String[] tokens = shard.split(":");
+          if (2 != tokens.length) {
+            throw new RuntimeException("Invalid shard specification " + shard);
+          }
+          this.modulus[idx] = Long.parseLong(tokens[0]);
+          this.remainder[idx] = Long.parseLong(tokens[1]);
+          
+          if (this.modulus[idx] < 1 || this.remainder[idx] >= this.modulus[idx]) {
+            throw new RuntimeException("Invalid shard specification " + shard);
+          }
+          idx++;
+        }
+      }
+    } else {
+      this.modulus = null;
+      this.remainder = null;
+      this.allShards = false;
+    }
+    
     queues = new LinkedBlockingDeque[nthreads];
     
     for (int i = 0; i < nthreads; i++) {
