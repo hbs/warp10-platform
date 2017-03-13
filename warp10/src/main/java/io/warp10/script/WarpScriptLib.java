@@ -309,6 +309,14 @@ public class WarpScriptLib {
   public static final String RUN = "RUN";
   public static final String BOOTSTRAP = "BOOTSTRAP";
   
+  public static final String FETCH = "FETCH";
+  public static final String FETCHLONG = "FETCHLONG";
+  public static final String FETCHDOUBLE = "FETCHDOUBLE";
+  public static final String FETCHBOOLEAN = "FETCHBOOLEAN";
+  public static final String FETCHSTRING = "FETCHSTRING";
+  
+  public static final String FIND = "FIND";
+      
   public static final String MAP_START = "{";
   public static final String MAP_END = "}";
 
@@ -656,14 +664,14 @@ public class WarpScriptLib {
     functions.put("MAKEGTS", new MAKEGTS("MAKEGTS"));
     functions.put("ADDVALUE", new ADDVALUE("ADDVALUE", false));
     functions.put("SETVALUE", new ADDVALUE("SETVALUE", true));
-    functions.put("FETCH", new FETCH("FETCH", false, null));
-    functions.put("FETCHLONG", new FETCH("FETCHLONG", false, TYPE.LONG));
-    functions.put("FETCHDOUBLE", new FETCH("FETCHDOUBLE", false, TYPE.DOUBLE));
-    functions.put("FETCHSTRING", new FETCH("FETCHSTRING", false, TYPE.STRING));
-    functions.put("FETCHBOOLEAN", new FETCH("FETCHBOOLEAN", false, TYPE.BOOLEAN));
+    functions.put(FETCH, new FETCH(FETCH, false, null));
+    functions.put(FETCHLONG, new FETCH(FETCHLONG, false, TYPE.LONG));
+    functions.put(FETCHDOUBLE, new FETCH(FETCHDOUBLE, false, TYPE.DOUBLE));
+    functions.put(FETCHSTRING, new FETCH(FETCHSTRING, false, TYPE.STRING));
+    functions.put(FETCHBOOLEAN, new FETCH(FETCHBOOLEAN, false, TYPE.BOOLEAN));
     functions.put("LIMIT", new LIMIT("LIMIT"));
     functions.put("MAXGTS", new MAXGTS("MAXGTS"));
-    functions.put("FIND", new FIND("FIND", false));
+    functions.put(FIND, new FIND(FIND, false));
     functions.put("FINDSETS", new FIND("FINDSETS", true));
     functions.put("METASET", new FIND("METASET", false, true));
     functions.put("FINDSTATS", new FINDSTATS("FINDSTATS"));
