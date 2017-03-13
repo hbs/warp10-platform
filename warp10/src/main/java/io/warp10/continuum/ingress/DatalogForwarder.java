@@ -119,6 +119,8 @@ public class DatalogForwarder extends Thread {
    */
   private final boolean deleteIgnored;
   
+  private final String suffix;
+  
   public static enum DatalogActionType {
     UPDATE,
     DELETE,
@@ -454,60 +456,66 @@ public class DatalogForwarder extends Thread {
   }
   
   public DatalogForwarder(KeyStore keystore, Properties properties) throws Exception {
+    this(null, keystore, properties);
+  }
+  
+  public DatalogForwarder(String name, KeyStore keystore, Properties properties) throws Exception {
     
-    this.rootdir = new File(properties.getProperty(Configuration.DATALOG_FORWARDER_SRCDIR)).toPath();
+    this.suffix = null == name ? "" : "." + name;
     
-    if (properties.containsKey(Configuration.DATALOG_PSK)) {
-      this.datalogPSK = keystore.decodeKey(properties.getProperty(Configuration.DATALOG_PSK));
+    this.rootdir = new File(properties.getProperty(Configuration.DATALOG_FORWARDER_SRCDIR + this.suffix)).toPath();
+    
+    if (properties.containsKey(Configuration.DATALOG_PSK + this.suffix)) {
+      this.datalogPSK = keystore.decodeKey(properties.getProperty(Configuration.DATALOG_PSK + this.suffix));
     } else {
       this.datalogPSK = null;
     }
     
-    this.period = Long.parseLong(properties.getProperty(Configuration.DATALOG_FORWARDER_PERIOD, DEFAULT_PERIOD));
+    this.period = Long.parseLong(properties.getProperty(Configuration.DATALOG_FORWARDER_PERIOD + this.suffix, DEFAULT_PERIOD));
     
-    this.compress = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_COMPRESS));
+    this.compress = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_COMPRESS + this.suffix));
     
-    this.actasclient = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_ACTASCLIENT));
+    this.actasclient = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_ACTASCLIENT + this.suffix));
     
     this.ignoredIds = new HashSet<String>();
     
-    if (properties.containsKey(Configuration.DATALOG_FORWARDER_IGNORED)) {
-      String[] ids = properties.getProperty(Configuration.DATALOG_FORWARDER_IGNORED).split(",");
+    if (properties.containsKey(Configuration.DATALOG_FORWARDER_IGNORED + this.suffix)) {
+      String[] ids = properties.getProperty(Configuration.DATALOG_FORWARDER_IGNORED + this.suffix).split(",");
       
       for (String id: ids) {
         ignoredIds.add(id.trim());
       }
     }
     
-    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_DSTDIR)) {
-      throw new RuntimeException("Datalog forwarder target directory (" +  Configuration.DATALOG_FORWARDER_DSTDIR + ") not set.");
+    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_DSTDIR + this.suffix)) {
+      throw new RuntimeException("Datalog forwarder target directory (" +  Configuration.DATALOG_FORWARDER_DSTDIR + this.suffix + ") not set.");
     }
 
-    this.targetDir = new File(properties.getProperty(Configuration.DATALOG_FORWARDER_DSTDIR));
+    this.targetDir = new File(properties.getProperty(Configuration.DATALOG_FORWARDER_DSTDIR + this.suffix));
 
     if (!this.targetDir.isDirectory()) {
       throw new RuntimeException("Invalid datalog forwarder target directory.");
     }
     
-    this.deleteForwarded = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_DELETEFORWARDED));
-    this.deleteIgnored = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_DELETEIGNORED));
+    this.deleteForwarded = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_DELETEFORWARDED + this.suffix));
+    this.deleteIgnored = "true".equals(properties.getProperty(Configuration.DATALOG_FORWARDER_DELETEIGNORED + this.suffix));
     
-    int nthreads = Integer.parseInt(properties.getProperty(Configuration.DATALOG_FORWARDER_NTHREADS, "1"));
+    int nthreads = Integer.parseInt(properties.getProperty(Configuration.DATALOG_FORWARDER_NTHREADS + this.suffix, "1"));
     
-    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_UPDATE)) {
+    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_UPDATE + this.suffix)) {
       throw new RuntimeException("Missing UPDATE endpoint.");
     }
-    this.updateUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_UPDATE));
+    this.updateUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_UPDATE + this.suffix));
 
-    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_DELETE)) {
+    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_DELETE + this.suffix)) {
       throw new RuntimeException("Missing DELETE endpoint.");
     }
-    this.deleteUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_DELETE));
+    this.deleteUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_DELETE + this.suffix));
 
-    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_META)) {
+    if (!properties.containsKey(Configuration.DATALOG_FORWARDER_ENDPOINT_META + this.suffix)) {
       throw new RuntimeException("Missing META endpoint.");
     }
-    this.metaUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_META));
+    this.metaUrl = new URL(properties.getProperty(Configuration.DATALOG_FORWARDER_ENDPOINT_META + this.suffix));
 
     queues = new LinkedBlockingDeque[nthreads];
     
@@ -516,7 +524,11 @@ public class DatalogForwarder extends Thread {
       DatalogForwarderWorker forwarder = new DatalogForwarderWorker(this, queues[i]);
     }
     
-    this.setName("[Datalog Forwarder]");
+    if (null == name) {
+      this.setName("[Datalog Forwarder]");
+    } else {
+      this.setName("[Datalog Forwarder '" + name + "']");
+    }
     this.setDaemon(true);
     this.start();
   }
