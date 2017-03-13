@@ -468,6 +468,11 @@ quantum.host = ${standalone.host}
 #datalog.dir = ${standalone.home}/datalog
 
 //
+// Set to true to log the sharding key with each datapoint. This is used when forwarders are
+// selecting shards to forward
+//
+#datalog.shardkey = false
+//
 // Unique id for this datalog instance.
 //
 #datalog.id = datalog-0

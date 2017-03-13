@@ -112,6 +112,11 @@ public class StandaloneIngressHandler extends AbstractHandler {
   
   private final long maxValueSize;
   
+  /**
+   * Flag indicating whether or not we should output the shardkey in the datalog request
+   */
+  private final boolean logShardKey;
+  
   public StandaloneIngressHandler(KeyStore keystore, StandaloneDirectoryClient directoryClient, StoreClient storeClient) {
     this.keyStore = keystore;
     this.storeClient = storeClient;
@@ -145,9 +150,15 @@ public class StandaloneIngressHandler extends AbstractHandler {
         datalogId = new String(OrderPreservingBase64.encode(id.getBytes(Charsets.UTF_8)), Charsets.US_ASCII);
       }
       
+      if ("true".equals(props.getProperty(Configuration.DATALOG_SHARDKEY))) {
+        logShardKey = true;
+      } else {
+        logShardKey = false;
+      }
     } else {
       loggingDir = null;
       datalogId = null;
+      logShardKey = false;
     }
     
     if (props.containsKey(Configuration.DATALOG_PSK)) {
@@ -443,6 +454,8 @@ public class StandaloneIngressHandler extends AbstractHandler {
         // Chunk index when archiving
         //
         
+        long shardkey = Long.MIN_VALUE;
+        
         do {
           
           String line = br.readLine();
@@ -492,8 +505,7 @@ public class StandaloneIngressHandler extends AbstractHandler {
             // Check throttling
             //
             
-            if (null != lastencoder) {
-              
+            if (null != lastencoder) {              
               // 128BITS
               lastencoder.setClassId(GTSHelper.classId(classKeyLongs, lastencoder.getName()));
               lastencoder.setLabelsId(GTSHelper.labelsId(labelsKeyLongs, lastencoder.getMetadata().getLabels()));
@@ -501,7 +513,7 @@ public class StandaloneIngressHandler extends AbstractHandler {
               ThrottlingManager.checkMADS(lastencoder.getMetadata(), producer, owner, application, lastencoder.getClassId(), lastencoder.getLabelsId());
               ThrottlingManager.checkDDP(lastencoder.getMetadata(), producer, owner, application, (int) lastencoder.getCount());
             }
-            
+                    
             //
             // Build metadata object to push
             //
@@ -509,11 +521,12 @@ public class StandaloneIngressHandler extends AbstractHandler {
             if (encoder != lastencoder) {
               Metadata metadata = new Metadata(encoder.getMetadata());
               metadata.setSource(Configuration.INGRESS_METADATA_SOURCE);
-              //nano6 += System.nanoTime() - nano0;
-              this.directoryClient.register(metadata);
-              //nano5 += System.nanoTime() - nano0;
-            }
 
+              this.directoryClient.register(metadata);
+              
+              // Extract shardkey 128BITS
+              shardkey =  GTSHelper.labelsId(labelsKeyLongs, encoder.getMetadata().getLabels()) >>> 8;
+            }
             
             if (null != lastencoder) {
               this.storeClient.store(lastencoder);              
@@ -538,6 +551,11 @@ public class StandaloneIngressHandler extends AbstractHandler {
           //
           
           if (null != loggingWriter) {
+            if (this.logShardKey) {
+              loggingWriter.print("#");
+              loggingWriter.print(shardkey);
+              loggingWriter.print(" ");
+            }                         
             loggingWriter.println(line);
           }
         } while (true); 
@@ -548,7 +566,7 @@ public class StandaloneIngressHandler extends AbstractHandler {
           // 128BITS
           lastencoder.setClassId(GTSHelper.classId(classKeyLongs, lastencoder.getName()));
           lastencoder.setLabelsId(GTSHelper.labelsId(labelsKeyLongs, lastencoder.getMetadata().getLabels()));
-                  
+             
           ThrottlingManager.checkMADS(lastencoder.getMetadata(), producer, owner, application, lastencoder.getClassId(), lastencoder.getLabelsId());
           ThrottlingManager.checkDDP(lastencoder.getMetadata(), producer, owner, application, (int) lastencoder.getCount());
           this.storeClient.store(lastencoder);
