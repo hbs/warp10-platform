@@ -1308,6 +1308,13 @@ public class Configuration {
    * forming.
    */
   public static final String DATALOG_FORWARDER_IGNORED = "datalog.forwarder.ignored";
+
+  /**
+   * Comma separated list of forwarder names, an instance of forwarder will be
+   * created for each listed name and each will look at properties ending in ".name"
+   * for its configuration.
+   */
+  public static final String DATALOG_FORWARDERS = "datalog.forwarders";
   
   /**
    * Directory from which to read the datalog files to forward
