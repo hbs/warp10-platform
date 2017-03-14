@@ -525,7 +525,7 @@ public class StandaloneIngressHandler extends AbstractHandler {
               this.directoryClient.register(metadata);
               
               // Extract shardkey 128BITS
-              shardkey =  GTSHelper.labelsId(labelsKeyLongs, encoder.getMetadata().getLabels()) >>> 8;
+              shardkey =  ((GTSHelper.classId(classKeyLongs, encoder.getMetadata().getName()) >>> 48) << 16) | (GTSHelper.labelsId(labelsKeyLongs, encoder.getMetadata().getLabels()) >>> 48);
             }
             
             if (null != lastencoder) {
