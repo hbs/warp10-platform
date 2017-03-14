@@ -305,9 +305,15 @@ public class WarpScriptLib {
   public static final String EVALSECURE = "EVALSECURE";
   public static final String SNAPSHOT = "SNAPSHOT";
   public static final String SNAPSHOTALL = "SNAPSHOTALL";
+  public static final String QSNAPSHOT = "QSNAPSHOT";
   public static final String LOAD = "LOAD";
   public static final String RUN = "RUN";
   public static final String BOOTSTRAP = "BOOTSTRAP";
+  
+  public static final String ADD = "+";
+  public static final String INPLACEADD = "+!";
+  public static final String PUT = "PUT";
+  public static final String RESIZE = "RESIZE";
   
   public static final String FETCH = "FETCH";
   public static final String FETCHLONG = "FETCHLONG";
@@ -328,6 +334,7 @@ public class WarpScriptLib {
   
   public static final String NEWGTS = "NEWGTS";
   public static final String SWAP = "SWAP";
+  public static final String DROP = "DROP";
   public static final String RELABEL = "RELABEL";
   public static final String RENAME = "RENAME";
   public static final String PARSESELECTOR = "PARSESELECTOR";
@@ -400,7 +407,7 @@ public class WarpScriptLib {
     functions.put("PICKLE->", new PICKLETO("PICKLE->"));
     functions.put("GET", new GET("GET"));
     functions.put("SET", new SET("SET"));
-    functions.put("PUT", new PUT("PUT"));
+    functions.put(PUT, new PUT(PUT));
     functions.put("SUBMAP", new SUBMAP("SUBMAP"));
     functions.put("SUBLIST", new SUBLIST("SUBLIST"));
     functions.put("KEYLIST", new KEYLIST("KEYLIST"));
@@ -417,7 +424,7 @@ public class WarpScriptLib {
     functions.put("DUP", new DUP("DUP"));
     functions.put("DUPN", new DUPN("DUPN"));
     functions.put(SWAP, new SWAP(SWAP));
-    functions.put("DROP", new DROP("DROP"));
+    functions.put(DROP, new DROP(DROP));
     functions.put("SAVE", new SAVE("SAVE"));
     functions.put("RESTORE", new RESTORE("RESTORE"));
     functions.put("CLEAR", new CLEAR("CLEAR"));
@@ -484,6 +491,7 @@ public class WarpScriptLib {
     functions.put("DOC", new DOC("DOC"));
     functions.put("DOCMODE", new DOCMODE("DOCMODE"));
     functions.put(SNAPSHOT, new SNAPSHOT(SNAPSHOT, false, false, true));
+    functions.put(QSNAPSHOT, new SNAPSHOT(QSNAPSHOT, false, false, true, false));
     functions.put(SNAPSHOTALL, new SNAPSHOT(SNAPSHOTALL, true, false, true));
     functions.put("SNAPSHOTTOMARK", new SNAPSHOT("SNAPSHOTTOMARK", false, true, true));
     functions.put("SNAPSHOTALLTOMARK", new SNAPSHOT("SNAPSHOTALLTOMARK", true, true, true));
@@ -508,8 +516,8 @@ public class WarpScriptLib {
     //functions.put("DUMP", new DUMP("DUMP"));
     
     // Binary ops
-    functions.put("+", new ADD("+"));
-    functions.put("+!", new INPLACEADD("+!"));
+    functions.put(ADD, new ADD(ADD));
+    functions.put(INPLACEADD, new INPLACEADD(INPLACEADD));
     functions.put("-", new SUB("-"));
     functions.put("/", new DIV("/"));
     functions.put("*", new MUL("*"));
