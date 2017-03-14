@@ -185,7 +185,8 @@ public class RCMD extends NamedWarpScriptFunction implements WarpScriptStackFunc
               byte[] bytes = baos.toByteArray();
               
               // Strip '[ ' ' ]'
-              String result = new String(bytes, 2, bytes.length - 4, Charsets.US_ASCII);
+              // INFO(hbs): We use US_ASCII because we know what the call returns (wrapped GTS) 
+              String result = bytes.length < 4 ? "" : new String(bytes, 2, bytes.length - 4, Charsets.US_ASCII);
               
               return result;
             } catch (IOException ioe) {
