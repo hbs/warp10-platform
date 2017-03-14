@@ -33,6 +33,7 @@ import io.warp10.continuum.store.thrift.data.Metadata;
 import io.warp10.crypto.CryptoUtils;
 import io.warp10.crypto.KeyStore;
 import io.warp10.crypto.OrderPreservingBase64;
+import io.warp10.crypto.SipHashInline;
 import io.warp10.quasar.token.thrift.data.WriteToken;
 import io.warp10.sensision.Sensision;
 
@@ -97,6 +98,11 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
   
   private final DateTimeFormatter dtf = DateTimeFormat.forPattern("yyyyMMdd'T'HHmmss.SSS").withZoneUTC();
 
+  private final long[] classKeyLongs;
+  private final long[] labelsKeyLongs;
+  
+  private final boolean logShardKey;
+  
   @WebSocket(maxTextMessageSize=1024 * 1024, maxBinaryMessageSize=1024 * 1024)
   public static class StandaloneStreamUpdateWebSocket {
     
@@ -185,6 +191,8 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
           File loggingFile = null;   
           PrintWriter loggingWriter = null;
           DatalogRequest dr = null;
+          
+          long shardkey = Long.MIN_VALUE;
           
           try {
             GTSEncoder lastencoder = null;
@@ -325,12 +333,15 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
                   Metadata metadata = new Metadata(encoder.getMetadata());
                   metadata.setSource(Configuration.INGRESS_METADATA_SOURCE);
                   this.handler.directoryClient.register(metadata);
+                  
+                  // Extract shardkey 128BITS
+                  shardkey =  ((GTSHelper.classId(this.handler.classKeyLongs, encoder.getMetadata().getName()) >>> 48) << 16) | (GTSHelper.labelsId(this.handler.labelsKeyLongs, encoder.getMetadata().getLabels()) >>> 48);
                 }
 
                 if (null != lastencoder) {
                   // 128BITS
-                  lastencoder.setClassId(GTSHelper.classId(this.handler.keyStore.getKey(KeyStore.SIPHASH_CLASS), lastencoder.getName()));
-                  lastencoder.setLabelsId(GTSHelper.labelsId(this.handler.keyStore.getKey(KeyStore.SIPHASH_LABELS), lastencoder.getLabels()));
+                  lastencoder.setClassId(GTSHelper.classId(this.handler.classKeyLongs, lastencoder.getName()));
+                  lastencoder.setLabelsId(GTSHelper.labelsId(this.handler.labelsKeyLongs, lastencoder.getLabels()));
                   this.handler.storeClient.store(lastencoder);
                   count += lastencoder.getCount();
                 }
@@ -349,7 +360,12 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
                 }
               }
               
-              if (null != loggingWriter) {
+              if (null != loggingWriter) {                
+                if (this.handler.logShardKey) {
+                  loggingWriter.print("#");
+                  loggingWriter.print(shardkey);
+                  loggingWriter.print(" ");
+                }                         
                 loggingWriter.println(line);
               }
             } while (true); 
@@ -478,6 +494,15 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
     this.directoryClient = directoryClient;
     this.properties = properties;
     
+    this.classKeyLongs = SipHashInline.getKey(keyStore.getKey(KeyStore.SIPHASH_CLASS));
+    this.labelsKeyLongs = SipHashInline.getKey(keyStore.getKey(KeyStore.SIPHASH_LABELS));
+    
+    if ("true".equals(properties.getProperty(Configuration.DATALOG_SHARDKEY))) {
+      logShardKey = true;
+    } else {
+      logShardKey = false;
+    }
+
     if (properties.containsKey(Configuration.DATALOG_DIR)) {
       File dir = new File(properties.getProperty(Configuration.DATALOG_DIR));
       
