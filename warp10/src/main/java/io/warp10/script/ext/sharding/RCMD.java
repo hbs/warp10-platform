@@ -11,6 +11,7 @@ import io.warp10.script.functions.APPEND;
 import io.warp10.script.functions.SNAPSHOT;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -43,13 +44,13 @@ public class RCMD extends NamedWarpScriptFunction implements WarpScriptStackFunc
   static {
     Properties props = WarpConfig.getProperties();
     
-    int rmcdpool = Integer.parseInt(props.getProperty(ShardingWarpScriptExtension.SHARDING_POOLSIZE, "4"));
-    maxThreadsPerRequest = Integer.parseInt(props.getProperty(ShardingWarpScriptExtension.SHARDING_MAXTHREADSPERREQUEST, Integer.toString(rmcdpool)));
+    int poolsize = Integer.parseInt(props.getProperty(ShardingWarpScriptExtension.SHARDING_POOLSIZE, "4"));
+    maxThreadsPerRequest = Integer.parseInt(props.getProperty(ShardingWarpScriptExtension.SHARDING_MAXTHREADSPERREQUEST, Integer.toString(poolsize)));
     
     
-    BlockingQueue<Runnable> queue = new LinkedBlockingDeque<Runnable>(rmcdpool);
+    BlockingQueue<Runnable> queue = new LinkedBlockingDeque<Runnable>(poolsize * 2);
     
-    executor = new ThreadPoolExecutor(rmcdpool, rmcdpool, 60, TimeUnit.SECONDS, queue);
+    executor = new ThreadPoolExecutor(poolsize, poolsize, 60, TimeUnit.SECONDS, queue);
     
     if (!props.containsKey(ShardingWarpScriptExtension.SHARDING_ENDPOINTS)) {
       throw new RuntimeException("Missing endpoints defined by '" + ShardingWarpScriptExtension.SHARDING_ENDPOINTS + "'.");
@@ -61,7 +62,7 @@ public class RCMD extends NamedWarpScriptFunction implements WarpScriptStackFunc
     
     for (int i = 0; i < urls.length; i++) {
       try {
-        endpoints[i] = new URL(urls[i]);
+        endpoints[i] = new URL(urls[i].trim());
       } catch (MalformedURLException mue) {
         throw new RuntimeException(mue);
       }
@@ -81,9 +82,21 @@ public class RCMD extends NamedWarpScriptFunction implements WarpScriptStackFunc
   
   @Override
   public Object apply(WarpScriptStack stack) throws WarpScriptException {
+    
+    // Save the max number of ops and depth, we need to bump it up so
+    // we can do everything we have to do
+    
+    long maxops = ((Number) stack.getAttribute(WarpScriptStack.ATTRIBUTE_MAX_OPS)).longValue();
+    stack.setAttribute(WarpScriptStack.ATTRIBUTE_MAX_OPS, Long.MAX_VALUE - 1);
+    long ops = ((Number) stack.getAttribute(WarpScriptStack.ATTRIBUTE_OPS)).longValue();
+    
+    int maxdepth = ((Number) stack.getAttribute(WarpScriptStack.ATTRIBUTE_MAX_DEPTH)).intValue();
+    stack.setAttribute(WarpScriptStack.ATTRIBUTE_MAX_DEPTH, Integer.MAX_VALUE - 1);
+    
     // Push a mark on the stack
     stack.push(new WarpScriptStack.Mark());
     stack.swap();
+    
     new SNAPSHOT("", false, true, true).apply(stack);
     
     final String params = stack.pop().toString();
@@ -132,13 +145,16 @@ public class RCMD extends NamedWarpScriptFunction implements WarpScriptStackFunc
               
               out.write(params.getBytes(Charsets.UTF_8));
               out.write('\n');
-              out.write(WarpScriptLib.EVAL.getBytes(Charsets.UTF_8));
+              // Get rid of the mark
+              out.write(WarpScriptLib.SWAP.getBytes(Charsets.UTF_8));
+              out.write('\n');
+              out.write(WarpScriptLib.DROP.getBytes(Charsets.UTF_8));
               out.write('\n');
               out.write(cmd.getBytes(Charsets.UTF_8));
               out.write('\n');              
-              out.write(WarpScriptLib.SNAPSHOT.getBytes(Charsets.UTF_8));      
-              out.write('\n');
-              out.write(WarpScriptLib.TOOPB64.getBytes(Charsets.UTF_8));
+              out.write(WarpScriptLib.QSNAPSHOT.getBytes(Charsets.UTF_8));      
+//              out.write('\n');
+//              out.write(WarpScriptLib.TOOPB64.getBytes(Charsets.UTF_8));
               out.write('\n');
               
               connout.flush();
@@ -172,6 +188,12 @@ public class RCMD extends NamedWarpScriptFunction implements WarpScriptStackFunc
               String result = new String(bytes, 2, bytes.length - 4, Charsets.US_ASCII);
               
               return result;
+            } catch (IOException ioe) {
+              if (null != conn) {
+                throw new IOException(conn.getResponseMessage());
+              } else {
+                throw ioe;
+              }
             } finally {
               if (null != conn) {
                 conn.disconnect();
@@ -199,11 +221,7 @@ public class RCMD extends NamedWarpScriptFunction implements WarpScriptStackFunc
     for (int i = 0; i < this.endpoints.length; i++) {
       try {
         String result = futures[i].get();
-        stack.push(result);
-        
-        stack.exec(WarpScriptLib.OPB64TO);
-        stack.push("UTF-8");
-        stack.exec(WarpScriptLib.BYTESTO);
+        stack.push(result);        
         stack.exec(WarpScriptLib.EVAL);        
       } catch (Exception e) {
         throw new WarpScriptException(e);
@@ -213,6 +231,15 @@ public class RCMD extends NamedWarpScriptFunction implements WarpScriptStackFunc
         append.apply(stack);
       }
     }
+
+    // Compute the number of operations we consumed
+    long opsdelta = ((Number) stack.getAttribute(WarpScriptStack.ATTRIBUTE_OPS)).longValue() - ops;
+    
+    // Restore maxops setting + the delta
+    stack.setAttribute(WarpScriptStack.ATTRIBUTE_MAX_OPS, maxops + opsdelta);
+
+    // Restore maxdepth
+    stack.setAttribute(WarpScriptStack.ATTRIBUTE_MAX_DEPTH, maxdepth);
 
     return stack;
   }  
