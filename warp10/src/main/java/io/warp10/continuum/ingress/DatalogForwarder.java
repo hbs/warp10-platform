@@ -234,7 +234,7 @@ public class DatalogForwarder extends Thread {
       BufferedReader br = null;
 
       HttpURLConnection conn = null;
-      
+
       try {
         br = new BufferedReader(new FileReader(action.file));
         
@@ -284,7 +284,7 @@ public class DatalogForwarder extends Thread {
             first = false;
             continue;
           }
-          // If shards are defined, check the shard key
+          // If shards are defined, check the shard key          
           if (forwarder.allShards || (null != forwarder.modulus && null != forwarder.remainder)) {
             if ('#' == line.charAt(0)) {
               int wspidx = line.indexOf(' ', 1);
@@ -582,7 +582,7 @@ public class DatalogForwarder extends Thread {
         int idx = 0;
         
         for (String shard: shards) {
-          String[] tokens = shard.split(":");
+          String[] tokens = shard.trim().split(":");
           if (2 != tokens.length) {
             throw new RuntimeException("Invalid shard specification " + shard);
           }
@@ -683,7 +683,7 @@ public class DatalogForwarder extends Thread {
           LOG.error("Error while reading Datalog Request", ioe);
           break;
         }
-                
+                       
         byte[] data = OrderPreservingBase64.decode(encoded.getBytes(Charsets.US_ASCII));
         
         if (null != this.datalogPSK) {
