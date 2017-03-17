@@ -294,6 +294,7 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
                 // Write request
                 //
                 
+                loggingWriter.print("#");
                 loggingWriter.println(new String(encoded, Charsets.US_ASCII));
               }
 
@@ -335,7 +336,7 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
                   this.handler.directoryClient.register(metadata);
                   
                   // Extract shardkey 128BITS
-                  shardkey =  ((GTSHelper.classId(this.handler.classKeyLongs, encoder.getMetadata().getName()) >>> 48) << 16) | (GTSHelper.labelsId(this.handler.labelsKeyLongs, encoder.getMetadata().getLabels()) >>> 48);
+                  shardkey =  (GTSHelper.classId(this.handler.classKeyLongs, encoder.getMetadata().getName()) & 0xFFFF0000L) | (GTSHelper.labelsId(this.handler.labelsKeyLongs, encoder.getMetadata().getLabels()) & 0xFFFFL);
                 }
 
                 if (null != lastencoder) {
@@ -361,10 +362,9 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
               }
               
               if (null != loggingWriter) {                
-                if (this.handler.logShardKey) {
-                  loggingWriter.print("#");
-                  loggingWriter.print(shardkey);
-                  loggingWriter.print(" ");
+                if (this.handler.logShardKey && '=' != line.charAt(0)) {
+                  loggingWriter.print("#K");
+                  loggingWriter.println(shardkey);
                 }                         
                 loggingWriter.println(line);
               }

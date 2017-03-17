@@ -16,11 +16,15 @@
 
 package io.warp10.continuum.gts;
 
+import io.warp10.WarpConfig;
+import io.warp10.WarpDist;
 import io.warp10.WarpURLEncoder;
 import io.warp10.continuum.TimeSource;
 import io.warp10.continuum.gts.GeoTimeSerie.TYPE;
 import io.warp10.continuum.store.Constants;
+import io.warp10.continuum.store.thrift.data.GTSWrapper;
 import io.warp10.continuum.store.thrift.data.Metadata;
+import io.warp10.crypto.KeyStore;
 import io.warp10.crypto.OrderPreservingBase64;
 import io.warp10.crypto.SipHashInline;
 import io.warp10.script.SAXUtils;
@@ -71,6 +75,8 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math3.fitting.PolynomialCurveFitter;
 import org.apache.commons.math3.fitting.WeightedObservedPoint;
+import org.apache.thrift.TDeserializer;
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.boon.json.JsonParser;
 import org.boon.json.JsonParserFactory;
 
@@ -1951,6 +1957,36 @@ public class GTSHelper {
       throw new ParseException("Unable to parse value '" + valuestr + "'", 0);
     }
     
+    if (value instanceof GTSWrapper) {
+      value = GTSWrapperHelper.fromGTSWrapperToGTSDecoder((GTSWrapper) value).getEncoder(true);
+      // Add the extra labels
+      if (null != extraLabels) {
+        ((GTSEncoder) value).getMetadata().getLabels().putAll(extraLabels);
+
+        if (extraLabels.containsValue(null)) {
+          Map<String,String> lbls = ((GTSEncoder) value).getMetadata().getLabels();
+          Set<Entry<String,String>> entries = extraLabels.entrySet();
+          
+          while(lbls.containsValue(null)) {
+            for (Entry<String,String> entry: entries) {
+              if (null == entry.getValue()) {
+                lbls.remove(entry.getKey());
+              }
+            }
+          }                 
+        }
+      }
+      return (GTSEncoder) value;
+    } else if (value instanceof GTSEncoder) {
+      ((GTSEncoder) value).setMetadata(new Metadata());
+      ((GTSEncoder) value).getMetadata().setName(name);
+      ((GTSEncoder) value).getMetadata().setLabels(labels);
+      if (null != attributes) {
+        ((GTSEncoder) value).getMetadata().setAttributes(attributes);
+      }
+      return (GTSEncoder) value;
+    }
+    
     // Allocate a new Encoder if need be, with a base timestamp of 0L.
     if (null == encoder || !name.equals(encoder.getName()) || !labels.equals(encoder.getMetadata().getLabels())) {
       encoder = new GTSEncoder(0L);
@@ -1970,6 +2006,8 @@ public class GTSHelper {
   public static GTSEncoder parse(GTSEncoder encoder, String str) throws ParseException, IOException {
     return parse(encoder, str, null);
   }
+  
+  private static long[] VALUE_PSK = null;
   
   public static Object parseValue(String valuestr) throws ParseException {
     
@@ -1995,6 +2033,76 @@ public class GTSHelper {
       //
       // FIXME(hbs): add support for quaternions, for hex values???
       //
+      } else if ('W' == valuestr.charAt(0)) {
+        // Support for signed wrappers
+        // W:hexsiphash(16 hex digits):opb64 wrapper
+        if (':' != valuestr.charAt(1)) {
+          throw new ParseException("Invalid wrapper, expecting W:hhhhhhhhhhhhhhhhh:wrapper", 0);
+        }
+        if (':' != valuestr.charAt(17)) {
+          throw new ParseException("Invalid wrapper, expecting W:hhhhhhhhhhhhhhhhh:wrapper", 0);
+        }
+        char[] chars = UnsafeString.getChars(valuestr);
+        // Extract siphash
+        long hash = Long.parseLong(new String(chars, 2, 16), 16);
+        // Extract OPB64 and compute its hash
+        String opb64 = new String(chars, 18, chars.length - 18);
+        byte[] bytes = opb64.getBytes("ASCII");
+        if (null == VALUE_PSK) {
+          synchronized(WarpDist.class) {
+            KeyStore ks = WarpDist.getKeyStore();
+            byte[] key = ks.getKey(KeyStore.SIPHASH_WRAPPERS_PSK);
+            if (null == key) {
+              throw new ParseException("Wrapper support not enabled, no defined signing key.", 0);
+            }
+            VALUE_PSK = SipHashInline.getKey(key);
+          }
+        }
+        long sip = SipHashInline.hash24(VALUE_PSK[0], VALUE_PSK[1], bytes, 0, bytes.length);
+        if (sip != hash) {
+          throw new ParseException("Invalid wrapper signature.", 0);
+        }
+        // Extract wrapper
+        bytes = OrderPreservingBase64.decode(bytes);
+        TDeserializer deser = new TDeserializer(new TCompactProtocol.Factory());
+        GTSWrapper wrapper = new GTSWrapper();
+        deser.deserialize(wrapper, bytes);
+        return wrapper;
+      } else if ('E' == valuestr.charAt(0)) {
+        // Support for signed encoders
+        // E:hexsiphash(16 hex digits):opb64 encoder
+        if (':' != valuestr.charAt(1)) {
+          throw new ParseException("Invalid encoder, expecting E:hhhhhhhhhhhhhhhhh:encoder", 0);
+        }
+        if (':' != valuestr.charAt(17)) {
+          throw new ParseException("Invalid encoder, expecting E:hhhhhhhhhhhhhhhhh:encoder", 0);
+        }
+        char[] chars = UnsafeString.getChars(valuestr);
+        // Extract siphash
+        long hash = Long.parseLong(new String(chars, 2, 16), 16);
+        // Extract OPB64 and compute its hash
+        String opb64 = new String(chars, 18, chars.length - 18);
+        byte[] bytes = opb64.getBytes("ASCII");
+        if (null == VALUE_PSK) {
+          synchronized(WarpDist.class) {
+            KeyStore ks = WarpDist.getKeyStore();
+            byte[] key = ks.getKey(KeyStore.SIPHASH_WRAPPERS_PSK);
+            if (null == key) {
+              throw new ParseException("Encoder support not enabled, no defined signing key.", 0);
+            }
+            VALUE_PSK = SipHashInline.getKey(key);
+          }
+        }
+        long sip = SipHashInline.hash24(VALUE_PSK[0], VALUE_PSK[1], bytes, 0, bytes.length);
+        if (sip != hash) {
+          throw new ParseException("Invalid encoder signature.", 0);
+        }
+        // Extract encoder
+        bytes = OrderPreservingBase64.decode(bytes);
+        GTSDecoder decoder = new GTSDecoder(0L, ByteBuffer.wrap(bytes));
+        decoder.next();
+        GTSEncoder encoder = decoder.getEncoder(true);
+        return encoder;
       } else {
         boolean likelydouble = UnsafeString.isDouble(valuestr);
         

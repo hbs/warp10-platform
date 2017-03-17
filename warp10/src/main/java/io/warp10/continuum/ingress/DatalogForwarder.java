@@ -273,49 +273,53 @@ public class DatalogForwarder extends Thread {
         PrintWriter pw = new PrintWriter(out);
                 
         boolean first = true;
+        boolean include = false;
         
         while(true) {
           String line = br.readLine();
           if (null == line) {
             break;
           }
+          
           // Ignore first line as it is the DatalogRequest
           if (first) {
             first = false;
             continue;
           }
+          
           // If shards are defined, check the shard key          
           if (forwarder.allShards || (null != forwarder.modulus && null != forwarder.remainder)) {
-            if ('#' == line.charAt(0)) {
-              int wspidx = line.indexOf(' ', 1);
-              
+            if (line.length() >= 3 && '#' == line.charAt(0) && 'K' == line.charAt(1)) {
               if (forwarder.allShards) {
-                pw.write(UnsafeString.getChars(line), wspidx + 1, line.length() - wspidx - 1);
-                pw.println();
+                include = true;
                 continue;
               }
         
               // Extract the shard key
-              long shardkey = Long.parseLong(line.substring(1,wspidx));
+              long shardkey = Long.parseLong(line.substring(2));
+              include = false;
               
               // Check if one shard matches, in which case we print out the line and continue
               for (int i = 0; i < forwarder.modulus.length; i++) {
                 if (shardkey % forwarder.modulus[i] == forwarder.remainder[i]) {
-                  pw.write(UnsafeString.getChars(line), wspidx + 1, line.length() - wspidx - 1);
-                  pw.println();
+                  include = true;
                   break;
                 }
               }
               continue;
             } else {
               // Ignore line if shard is not present and we are not forwarding everything
-              if (!forwarder.allShards) {
+              if (!forwarder.allShards && !include) {
                 continue;
               }
             }
+          } else {
+            include = true;
           }
           
-          pw.println(line);
+          if (include) {
+            pw.println(line);
+          }
         }
         
         pw.close();
@@ -678,13 +682,25 @@ public class DatalogForwarder extends Thread {
         try {
           BufferedReader br = new BufferedReader(new FileReader(action.file));
           encoded = br.readLine();
+          
           br.close();          
+
+          if (null == encoded) {
+            break;
+          }
         } catch (IOException ioe) {
           LOG.error("Error while reading Datalog Request", ioe);
           break;
         }
-                       
-        byte[] data = OrderPreservingBase64.decode(encoded.getBytes(Charsets.US_ASCII));
+          
+        byte[] bytes = encoded.getBytes(Charsets.US_ASCII); 
+        byte[] data;
+        
+        if ('#' == encoded.charAt(0)) {
+          data = OrderPreservingBase64.decode(bytes, 1, bytes.length - 1);          
+        } else {
+          data = OrderPreservingBase64.decode(bytes);          
+        }
         
         if (null != this.datalogPSK) {
           data = CryptoUtils.unwrap(this.datalogPSK, data);

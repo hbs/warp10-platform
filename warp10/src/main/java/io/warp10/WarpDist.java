@@ -190,6 +190,12 @@ public class WarpDist {
       keystore.setKey(KeyStore.AES_RUNNER_PSK, key);
     }
 
+    if (null != properties.getProperty(Configuration.WARP_HASH_WRAPPERS)) {
+      byte[] key = keystore.decodeKey(properties.getProperty(Configuration.WARP_HASH_WRAPPERS));
+      Preconditions.checkArgument(16 == key.length, "Key " + Configuration.WARP_HASH_WRAPPERS + " MUST be 128 bits long.");
+      keystore.setKey(KeyStore.SIPHASH_WRAPPERS_PSK, key);
+    }
+
     WarpScriptLib.registerExtensions();
     
     KafkaWebCallService.initKeys(keystore, properties);

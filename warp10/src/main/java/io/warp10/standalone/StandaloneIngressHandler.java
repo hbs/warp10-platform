@@ -432,6 +432,7 @@ public class StandaloneIngressHandler extends AbstractHandler {
             // Write request
             //
             
+            loggingWriter.print("#");
             loggingWriter.println(new String(encoded, Charsets.US_ASCII));          
           }
           
@@ -525,7 +526,7 @@ public class StandaloneIngressHandler extends AbstractHandler {
               this.directoryClient.register(metadata);
               
               // Extract shardkey 128BITS
-              shardkey =  ((GTSHelper.classId(classKeyLongs, encoder.getMetadata().getName()) >>> 48) << 16) | (GTSHelper.labelsId(labelsKeyLongs, encoder.getMetadata().getLabels()) >>> 48);
+              shardkey =  (GTSHelper.classId(classKeyLongs, encoder.getMetadata().getName()) & 0xFFFF0000L) | (GTSHelper.labelsId(labelsKeyLongs, encoder.getMetadata().getLabels()) & 0xFFFFL);
             }
             
             if (null != lastencoder) {
@@ -551,10 +552,9 @@ public class StandaloneIngressHandler extends AbstractHandler {
           //
           
           if (null != loggingWriter) {
-            if (this.logShardKey) {
-              loggingWriter.print("#");
-              loggingWriter.print(shardkey);
-              loggingWriter.print(" ");
+            if (this.logShardKey && '=' != line.charAt(0)) {
+              loggingWriter.print("#K");
+              loggingWriter.println(shardkey);
             }                         
             loggingWriter.println(line);
           }
@@ -778,6 +778,7 @@ public class StandaloneIngressHandler extends AbstractHandler {
           // Write request
           //
           
+          loggingWriter.print("#");
           loggingWriter.println(new String(encoded, Charsets.US_ASCII));        
         }
       }

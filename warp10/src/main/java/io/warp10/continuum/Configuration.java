@@ -37,6 +37,8 @@ public class Configuration {
   
   public static final String WARP_IDENT = "warp.ident";
   
+  public static final String WARP_HASH_WRAPPERS = "warp.hash.wrappers";
+  
   public static final String WARP10_QUIET = "warp10.quiet";
   
   /**

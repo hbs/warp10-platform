@@ -45,7 +45,7 @@ public class GTSWrapperHelper {
     
     return decoder;
   }
-  
+
   /**
    * convert a GTSWrapper into GeoTimeSerie
    * @param wrapper

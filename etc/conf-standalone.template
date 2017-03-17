@@ -30,6 +30,11 @@ warp.hash.token = @key:128:warp.hash.token@
 warp.hash.app = @key:128:warp.hash.app@
 
 //
+// SipHash key for computing digest of wrappers
+//
+warp.hash.wrappers = @key:128:warp.hash.wrappers@
+
+//
 // 256 bits key for protecting tokens, format is hex:hhhh...hhhh
 //
 warp.aes.token = @key:256:warp.aes.token@

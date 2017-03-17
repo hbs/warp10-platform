@@ -313,6 +313,11 @@ public class Warp extends WarpDist implements Runnable {
       scc = new StandaloneParallelStoreClientWrapper(scc);
     }
 
+    if ("true".equals(System.getProperty("dump"))) {
+      StandaloneDumper.dump(sdc, scc, keystore, System.getProperty("dump.dir"));
+      System.exit(0);
+    }
+    
     StandaloneGeoDirectory geodir = new StandaloneGeoDirectory(keystore.clone(), scc, sdc, properties);
     
     if (properties.containsKey(Configuration.RUNNER_ROOT)) {
@@ -503,6 +508,12 @@ public class Warp extends WarpDist implements Runnable {
       byte[] key = keystore.decodeKey(props.getProperty(Configuration.RUNNER_PSK));
       Preconditions.checkArgument(16 == key.length || 24 == key.length || 32 == key.length, "Key " + Configuration.RUNNER_PSK + " MUST be 128, 192 or 256 bits long.");
       keystore.setKey(KeyStore.AES_RUNNER_PSK, key);
+    }
+    
+    if (null != props.getProperty(Configuration.WARP_HASH_WRAPPERS)) {
+      byte[] key = keystore.decodeKey(props.getProperty(Configuration.WARP_HASH_WRAPPERS));
+      Preconditions.checkArgument(16 == key.length, "Key " + Configuration.WARP_HASH_WRAPPERS + " MUST be 128 bits long.");
+      keystore.setKey(KeyStore.SIPHASH_WRAPPERS_PSK, key);
     }
   }  
 
