@@ -243,7 +243,7 @@ public class StandaloneDumper {
           byte[] opb64 = OrderPreservingBase64.encode(ser.serialize(wrapper));
           // Compute SipHash
           long hash = SipHashInline.hash24(wrappersKeyLongs[0], wrappersKeyLongs[1], opb64, 0, opb64.length);
-          // Output shardkey
+          // Output shardkey 128BITS
           long shardkey =  (decoder.getMetadata().getClassId() & 0xFFFF0000L) | (decoder.getMetadata().getLabelsId() & 0xFFFFL);
           pw.print("#K");
           pw.println(shardkey);
