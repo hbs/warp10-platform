@@ -800,6 +800,11 @@ public class Ingress extends AbstractHandler implements Runnable {
             }
             
             if (pushMeta) {
+              // Update metadataCache with the current key
+              synchronized(metadataCache) {
+                this.metadataCache.put(metadataCacheKey, (activityTracking && updateActivity) ? nowms : null);
+              }
+
               // Build metadata object to push
               Metadata metadata = new Metadata();
               // Set source to indicate we
