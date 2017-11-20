@@ -803,6 +803,11 @@ public class Ingress extends AbstractHandler implements Runnable {
             }
             
             if (pushMeta) {
+              // Update metadataCache with the current key
+              synchronized(metadataCache) {
+                this.metadataCache.put(metadataCacheKey, (activityTracking && updateActivity) ? nowms : null);
+              }
+
               // Build metadata object to push
               Metadata metadata = new Metadata();
               // Set source to indicate we
@@ -822,11 +827,6 @@ public class Ingress extends AbstractHandler implements Runnable {
               }
             }
             
-            // Update metadataCache with the current key
-            synchronized(metadataCache) {
-              this.metadataCache.put(metadataCacheKey, (activityTracking && updateActivity) ? nowms : null);
-            }
-
             if (null != lastencoder) {
               Map<String,String> labels = new HashMap<String, String>();
               //labels.put(SensisionConstants.SENSISION_LABEL_OWNER, owner);
