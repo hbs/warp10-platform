@@ -97,7 +97,7 @@ public class RCMD extends NamedWarpScriptFunction implements WarpScriptStackFunc
     stack.push(new WarpScriptStack.Mark());
     stack.swap();
     
-    new SNAPSHOT("", false, true, true).apply(stack);
+    new SNAPSHOT("", false, true, true, false).apply(stack);
     
     final String params = stack.pop().toString();
     
