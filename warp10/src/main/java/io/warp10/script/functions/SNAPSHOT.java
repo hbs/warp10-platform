@@ -16,24 +16,6 @@
 
 package io.warp10.script.functions;
 
-import io.warp10.WarpURLEncoder;
-<<<<<<< HEAD
-import io.warp10.continuum.gts.GTSWrapperHelper;
-=======
-import io.warp10.continuum.gts.GTSEncoder;
->>>>>>> b1a78a2e86721925f1e37a7f35e0fc283535276e
-import io.warp10.continuum.gts.GeoTimeSerie;
-import io.warp10.continuum.store.thrift.data.GTSWrapper;
-import io.warp10.crypto.OrderPreservingBase64;
-import io.warp10.script.MemoryWarpScriptStack;
-import io.warp10.script.NamedWarpScriptFunction;
-import io.warp10.script.WarpScriptException;
-import io.warp10.script.WarpScriptLib;
-import io.warp10.script.WarpScriptStack;
-import io.warp10.script.WarpScriptStack.Macro;
-import io.warp10.script.WarpScriptStackFunction;
-import io.warp10.script.WarpScriptStack.Mark;
-
 import java.io.UnsupportedEncodingException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
@@ -47,12 +29,21 @@ import java.util.UUID;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TCompactProtocol;
-
 import com.geoxp.GeoXPLib.GeoXPShape;
 import com.google.common.base.Charsets;
+
+import io.warp10.WarpURLEncoder;
+import io.warp10.continuum.gts.GTSEncoder;
+import io.warp10.continuum.gts.GeoTimeSerie;
+import io.warp10.crypto.OrderPreservingBase64;
+import io.warp10.script.MemoryWarpScriptStack;
+import io.warp10.script.NamedWarpScriptFunction;
+import io.warp10.script.WarpScriptException;
+import io.warp10.script.WarpScriptLib;
+import io.warp10.script.WarpScriptStack;
+import io.warp10.script.WarpScriptStack.Macro;
+import io.warp10.script.WarpScriptStack.Mark;
+import io.warp10.script.WarpScriptStackFunction;
 
 /**
  * Replaces the stack so far with a WarpScript snippet which will regenerate
@@ -88,17 +79,27 @@ public class SNAPSHOT extends NamedWarpScriptFunction implements WarpScriptStack
   private final boolean countbased;
   
   /**
+   * Should we compress wrappers when snapshotting GTS/Encoders?
+   */
+  private final boolean compresswrappers;
+  
+  /**
    * Should we pop the elements out of the stack when building the snapshot
    */
   private final boolean pop;
   
   public SNAPSHOT(String name, boolean snapshotSymbols, boolean toMark, boolean pop, boolean countbased) {
+    this(name, snapshotSymbols, toMark, pop, countbased, true);
+  }
+  
+  public SNAPSHOT(String name, boolean snapshotSymbols, boolean toMark, boolean pop, boolean countbased, boolean compresswrappers) {
     super(name);
     this.snapshotSymbols = snapshotSymbols;
     this.toMark = toMark;
     this.pop = pop;
 
     this.countbased = countbased;
+    this.compresswrappers = compresswrappers;
   }
   
   @Override
@@ -211,7 +212,7 @@ public class SNAPSHOT extends NamedWarpScriptFunction implements WarpScriptStack
         stack.maxLimits();
         
         stack.push(o);
-        WRAP w = new WRAP("");        
+        WRAP w = new WRAP("", false, snapshot.compresswrappers);        
         w.apply(stack);
         
         sb.append(stack.pop());          
