@@ -60,8 +60,6 @@ import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.apache.thrift.protocol.TCompactProtocol.Factory;
 
-import sun.security.tools.KeyStoreUtil;
-
 import com.geoxp.GeoXPLib;
 import com.google.common.base.Charsets;
 
