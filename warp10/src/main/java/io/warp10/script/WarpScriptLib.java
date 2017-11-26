@@ -520,7 +520,7 @@ public class WarpScriptLib {
     functions.put("SNAPSHOTCOPYALLTOMARK", new SNAPSHOT("SNAPSHOTCOPYALLTOMARK", true, true, false, false));
     functions.put("SNAPSHOTN", new SNAPSHOT("SNAPSHOTN", false, false, true, true));
     functions.put("SNAPSHOTCOPYN", new SNAPSHOT("SNAPSHOTCOPYN", false, false, false, true));
-
+    functions.put(QSNAPSHOT, new SNAPSHOT(QSNAPSHOT, false, false, true, false, false));
     functions.put("HEADER", new HEADER("HEADER"));
     
     functions.put("MACROMAPPER", new MACROMAPPER("MACROMAPPER"));
