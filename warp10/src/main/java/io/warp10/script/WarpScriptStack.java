@@ -19,6 +19,8 @@ package io.warp10.script;
 import io.warp10.continuum.geo.GeoDirectoryClient;
 import io.warp10.continuum.store.DirectoryClient;
 import io.warp10.continuum.store.StoreClient;
+import io.warp10.script.functions.SNAPSHOT;
+import io.warp10.script.functions.SNAPSHOT.Snapshotable;
 import io.warp10.warp.sdk.WarpScriptJavaFunction;
 
 import java.util.ArrayList;
@@ -45,6 +47,7 @@ public interface WarpScriptStack {
   public static final long DEFAULT_GTS_LIMIT = 100000L;
   public static final long DEFAULT_MAX_OPS = 1000L;
   public static final int DEFAULT_MAX_BUCKETS = 1000000;
+  public static final int DEFAULT_MAX_GEOCELLS = 10000;
   public static final int DEFAULT_MAX_DEPTH = 1000;
   public static final long DEFAULT_MAX_LOOP_DURATION = 5000L;
   public static final int DEFAULT_MAX_SYMBOLS = 64;
@@ -64,6 +67,18 @@ public interface WarpScriptStack {
   
   public static final String SECURE_SCRIPT_START = "<S";
   public static final String SECURE_SCRIPT_END = "S>";
+  
+  public static final String TOP_LEVEL_SECTION = "[TOP]";
+  
+  /**
+   * Prefix for traceing push/pop
+   */
+  public static final String ATTRIBUTE_TRACE_PREFIX = "trace.prefix";
+  
+  /**
+   * Name of current code section, null is unnamed
+   */
+  public static final String ATTRIBUTE_SECTION_NAME = "section.name";
   
   /**
    * Flag indicating whether or not the stack is currently in documentation mode
@@ -177,6 +192,12 @@ public interface WarpScriptStack {
   public static final String ATTRIBUTE_MAX_BUCKETS_HARD = "stack.maxbuckets.hard";
   
   /**
+   * Maximum number of cells if GeoXPShapes   
+   */
+  public static final String ATTRIBUTE_MAX_GEOCELLS = "stack.maxgeocells";
+  public static final String ATTRIBUTE_MAX_GEOCELLS_HARD = "stack.maxgeocells.hard";
+  
+  /**
    * Current number of operations performed on this stack
    */
   public static final String ATTRIBUTE_OPS = "stack.ops";
@@ -229,6 +250,11 @@ public interface WarpScriptStack {
   public static final String ATTRIBUTE_HEADERS = "response.headers";
   
   /**
+   * Last error encountered in a TRY block
+   */
+  public static final String ATTRIBUTE_LAST_ERROR = "last.error";
+  
+  /**
    * Index of RETURN_DEPTH counter
    */
   public static final int COUNTER_RETURN_DEPTH = 0;
@@ -237,12 +263,14 @@ public interface WarpScriptStack {
   
   public static class Mark {}
   
-  public static class Macro {
+  public static class Macro implements Snapshotable {
     
     /**
      * Flag indicating whether a macro is secure (its content cannot be displayed) or not
      */
     private boolean secure = false;
+    
+    private long fingerprint;
     
     private ArrayList<Object> statements = new ArrayList<Object>();
     
@@ -295,6 +323,44 @@ public interface WarpScriptStack {
     
     public boolean isSecure() {
       return this.secure;
+    }
+    
+    public long getFingerprint() {
+      return this.fingerprint;
+    }
+    
+    public void setFingerprint(long fingerprint) {
+      this.fingerprint = fingerprint;
+    }
+    
+    @Override
+    public String snapshot() {
+      StringBuilder sb = new StringBuilder();
+      
+      sb.append(MACRO_START);
+      sb.append(" ");
+
+      if (!secure) {
+        for (Object o: this.statements()) {
+          try {
+            SNAPSHOT.addElement(sb, o);
+          } catch (WarpScriptException wse) {
+            sb.append(WarpScriptStack.COMMENT_START);
+            sb.append(" Error while snapshoting element of type '" + o.getClass() + "' ");
+            sb.append(WarpScriptStack.COMMENT_END);
+          }
+          sb.append(" ");        
+        }
+      } else {
+        sb.append(WarpScriptStack.COMMENT_START);
+        sb.append(" Secure Macro ");
+        sb.append(WarpScriptStack.COMMENT_END);
+        sb.append(" ");
+      }
+      
+      sb.append(MACRO_END);
+      
+      return sb.toString();
     }
   }
   

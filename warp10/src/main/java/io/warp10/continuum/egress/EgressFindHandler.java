@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
@@ -105,6 +106,9 @@ public class EgressFindHandler extends AbstractHandler {
 
       boolean showUUID = "true".equals(req.getParameter(Constants.HTTP_PARAM_SHOWUUID));
       
+      boolean showAttr = !("false".equals(req.getParameter(Constants.HTTP_PARAM_SHOWATTR)));
+      boolean sortMeta = "true".equals(req.getParameter(Constants.HTTP_PARAM_SORTMETA));
+
       ReadToken rtoken;
       
       try {
@@ -193,13 +197,23 @@ public class EgressFindHandler extends AbstractHandler {
               GTSHelper.encodeName(sb, metadata.getName());
               
               if (metadata.getLabelsSize() > 0) {
-                GTSHelper.labelsToString(sb, metadata.getLabels());
+                if (sortMeta) {
+                  GTSHelper.labelsToString(sb, new TreeMap<String,String>(metadata.getLabels()));
+                } else {
+                  GTSHelper.labelsToString(sb, metadata.getLabels());
+                }
               }
               
-              if (metadata.getAttributesSize() > 0) {
-                GTSHelper.labelsToString(sb, metadata.getAttributes());
-              } else {
-                sb.append("{}");
+              if (showAttr) {
+                if (metadata.getAttributesSize() > 0) {
+                  if (sortMeta) {
+                    GTSHelper.labelsToString(sb, new TreeMap<String,String>(metadata.getAttributes()));
+                  } else {
+                    GTSHelper.labelsToString(sb, metadata.getAttributes());
+                  }
+                } else {
+                  sb.append("{}");
+                }
               }
               
               pw.println(sb.toString());

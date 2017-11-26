@@ -14,32 +14,27 @@
 //   limitations under the License.
 //
 
-package io.warp10.standalone;
+package io.warp10.script.functions;
 
-import java.io.IOException;
-import java.io.OutputStream;
+import io.warp10.script.NamedWarpScriptFunction;
+import io.warp10.script.WarpScriptException;
+import io.warp10.script.WarpScriptStack;
+import io.warp10.script.WarpScriptStackFunction;
 
-public class CapacityExtractorOutputStream extends OutputStream {  
-  private int capacity;
+/**
+ * Push the current section name onto the stack
+ */
+public class GETSECTION extends NamedWarpScriptFunction implements WarpScriptStackFunction {
   
-  @Override
-  public void write(int b) throws IOException {}
-  
-  @Override
-  public void write(byte[] b) throws IOException {
-    synchronized(this) {
-      this.capacity = b.length;
-    }
+  public GETSECTION(String name) {
+    super(name);
   }
   
   @Override
-  public void write(byte[] b, int off, int len) throws IOException {
-    synchronized(this) {
-      this.capacity = b.length;
-    }
-  }
-  
-  public synchronized int getCapacity() {
-    return this.capacity;
+  public Object apply(WarpScriptStack stack) throws WarpScriptException {
+    
+    stack.push(stack.getAttribute(WarpScriptStack.ATTRIBUTE_SECTION_NAME).toString());
+    
+    return stack;
   }
 }

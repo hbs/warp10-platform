@@ -17,7 +17,11 @@
 package io.warp10.script.functions;
 
 import io.warp10.WarpURLEncoder;
+<<<<<<< HEAD
 import io.warp10.continuum.gts.GTSWrapperHelper;
+=======
+import io.warp10.continuum.gts.GTSEncoder;
+>>>>>>> b1a78a2e86721925f1e37a7f35e0fc283535276e
 import io.warp10.continuum.gts.GeoTimeSerie;
 import io.warp10.continuum.store.thrift.data.GTSWrapper;
 import io.warp10.crypto.OrderPreservingBase64;
@@ -81,32 +85,38 @@ public class SNAPSHOT extends NamedWarpScriptFunction implements WarpScriptStack
   
   private final boolean toMark;
   
+  private final boolean countbased;
+  
   /**
    * Should we pop the elements out of the stack when building the snapshot
    */
   private final boolean pop;
   
-  private final boolean compresswrappers;
-  
-  public SNAPSHOT(String name, boolean snapshotSymbols, boolean toMark, boolean pop) {
-    this(name, snapshotSymbols, toMark, pop, true);
-  }
-  
-  public SNAPSHOT(String name, boolean snapshotSymbols, boolean toMark, boolean pop, boolean compresswrappers) {
+  public SNAPSHOT(String name, boolean snapshotSymbols, boolean toMark, boolean pop, boolean countbased) {
     super(name);
     this.snapshotSymbols = snapshotSymbols;
     this.toMark = toMark;
     this.pop = pop;
-    this.compresswrappers = compresswrappers;
+
+    this.countbased = countbased;
   }
   
   @Override
   public Object apply(WarpScriptStack stack) throws WarpScriptException {
-    StringBuilder sb = new StringBuilder();
-
+    
     int lastidx = 0;
     
-    if (!this.toMark) {
+    StringBuilder sb = new StringBuilder();
+
+    if (this.countbased) {
+      Object top = stack.pop();
+      
+      lastidx = ((Number) top).intValue() - 1;
+
+      if (lastidx > stack.depth() - 1) {
+        lastidx = stack.depth() - 1;
+      }      
+    } else if (!this.toMark) {
       lastidx = stack.depth() - 1;
     } else {      
       int i = 0;
@@ -191,33 +201,27 @@ public class SNAPSHOT extends NamedWarpScriptFunction implements WarpScriptStack
         } else {
           sb.append("false ");
         }
-      } else if (o instanceof GeoTimeSerie) {
+      } else if (o instanceof GeoTimeSerie || o instanceof GTSEncoder) {
         sb.append("'");
+        //
+        // Create a stack so we can call WRAP
+        //
         
-        if (null != snapshot && !snapshot.compresswrappers) {
-          try {
-            GTSWrapper wrapper = GTSWrapperHelper.fromGTSToGTSWrapper((GeoTimeSerie) o, false);
-            TSerializer ser = new TSerializer(new TCompactProtocol.Factory());
-            sb.append(new String(OrderPreservingBase64.encode(ser.serialize(wrapper)), Charsets.UTF_8));
-          } catch (TException te) {
-            throw new WarpScriptException(te);
-          }          
-        } else {
-          //
-          // Create a stack so we can call WRAP
-          //
-          
-          MemoryWarpScriptStack stack = new MemoryWarpScriptStack(null, null, new Properties());
-          stack.maxLimits();
-          
-          stack.push(o);
-          WRAP w = new WRAP("");        
-          w.apply(stack);
-          
-          sb.append(stack.pop());          
-        }
+        MemoryWarpScriptStack stack = new MemoryWarpScriptStack(null, null, new Properties());
+        stack.maxLimits();
+        
+        stack.push(o);
+        WRAP w = new WRAP("");        
+        w.apply(stack);
+        
+        sb.append(stack.pop());          
+
         sb.append("' ");
-        sb.append(WarpScriptLib.UNWRAP);
+        if (o instanceof GeoTimeSerie) {
+          sb.append(WarpScriptLib.UNWRAP);
+        } else {
+          sb.append(WarpScriptLib.UNWRAPENCODER);
+        }
         sb.append(" ");
       } else if (o instanceof Vector) {
         sb.append(WarpScriptLib.LIST_START);
@@ -284,11 +288,11 @@ public class SNAPSHOT extends NamedWarpScriptFunction implements WarpScriptStack
       } else if (o instanceof Mark) {
         sb.append(WarpScriptLib.MARK);
         sb.append(" ");
-      } else if (o instanceof Macro) {
-        sb.append(o.toString());
-        sb.append(" ");
       } else if (o instanceof Snapshotable) {
         sb.append(((Snapshotable) o).snapshot());
+        sb.append(" ");
+      } else if (o instanceof Macro) {
+        sb.append(o.toString());
         sb.append(" ");
       } else if (o instanceof RSAPublicKey) {
         sb.append("{ 'algorithm' 'RSA' 'exponent' '");
@@ -305,7 +309,10 @@ public class SNAPSHOT extends NamedWarpScriptFunction implements WarpScriptStack
         sb.append(((RSAPrivateKey) o).getModulus());
         sb.append("' } ");
         sb.append(WarpScriptLib.RSAPRIVATE);
-        sb.append(" ");        
+        sb.append(" ");
+      } else if (o instanceof NamedWarpScriptFunction) {
+        sb.append(o.toString());
+        sb.append(" ");
       } else {
         // Some types are not supported
         // functions, PImage...

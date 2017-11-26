@@ -104,10 +104,29 @@ warp.aes.metasets = hex:hhhhhhhh....
 #warp.token.file = 
 
 //
+// Root directory where trl files are stored
+//
+#warp.trl.dir =
+
+//
 // Pre-Shared key for signing fetch requests. Signed fetch request expose owner/producer
 //
 #fetch.psk =
 
+//
+// Set to true to disable plasma
+//
+#warp.plasma.disable =
+
+//
+// Set to true to disable mobius
+//
+#warp.mobius.disable =
+
+//
+// Set to true to disable streaming updates
+//
+#warp.streamupdate.disable =
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -146,6 +165,9 @@ warpscript.def.unshadow = false
 // How often (in ms) should the above directory be rescanned
 #warpscript.repository.refresh = 60000
 
+// Set to true to enable on demand loading of macros not yet loaded.
+#warpscript.repository.ondemand = true
+
 //
 // Default maximum number of operations a single WarpScript execution can do
 //
@@ -158,6 +180,13 @@ warpscript.maxops.hard = 2000
 //
 warpscript.maxbuckets = 1000000
 warpscript.maxbuckets.hard = 100000
+
+//
+// Maximum number of cells in geographic shapes
+// Can be modified by MAXGEOCELLS up to the hard limit below
+//
+warpscript.maxgeocells = 10000
+warpscript.maxgeocells.hard = 100000
 
 //
 // Maximum depth of the stack
@@ -1020,6 +1049,11 @@ store.hbase.hconnection.threads.core = 4
 // Client id to use to consume the data topic
 //
 #store.kafka.data.consumer.clientid = 
+
+//
+// A prefix prepended to the Kafka ConsumerId
+//
+#store.kafka.data.consumerid.prefix =
 
 //
 // Custom value of 'hbase.client.ipc.pool.size' for the Store HBase pool

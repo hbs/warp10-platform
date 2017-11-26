@@ -16,6 +16,7 @@
 
 package io.warp10.script.functions;
 
+import io.warp10.continuum.gts.GTSEncoder;
 import io.warp10.continuum.gts.GeoTimeSerie;
 import io.warp10.script.NamedWarpScriptFunction;
 import io.warp10.script.WarpScriptStackFunction;
@@ -35,11 +36,15 @@ public class NAME extends NamedWarpScriptFunction implements WarpScriptStackFunc
   public Object apply(WarpScriptStack stack) throws WarpScriptException {
     Object o = stack.pop();
     
-    if (!(o instanceof GeoTimeSerie)) {
-      throw new WarpScriptException(getName() + " expects a Geo Time Series instance on top of the stack.");
+    if (!(o instanceof GeoTimeSerie) && !(o instanceof GTSEncoder)) {
+      throw new WarpScriptException(getName() + " expects a Geo Time Series or encoder instance on top of the stack.");
     }
     
-    stack.push(((GeoTimeSerie) o).getName());
+    if (o instanceof GeoTimeSerie) {
+      stack.push(((GeoTimeSerie) o).getName());
+    } else {
+      stack.push(((GTSEncoder) o).getName());
+    }
 
     return stack;
   }

@@ -73,6 +73,8 @@ public class StandaloneDeleteHandler extends AbstractHandler {
   
   private static final Logger LOG = LoggerFactory.getLogger(StandaloneDeleteHandler.class);
 
+  private static final int MAX_LOGGED_DELETED_GTS = 1000;
+  
   private final KeyStore keyStore;
   private final StoreClient storeClient;
   private final StandaloneDirectoryClient directoryClient;
@@ -250,7 +252,9 @@ public class StandaloneDeleteHandler extends AbstractHandler {
     
     Throwable t = null;
     StringBuilder metas = new StringBuilder();
-
+    // Boolean indicating whether or not we should continue adding results to 'metas'
+    boolean metasSaturated = false;
+    
     //
     // Extract start/end
     //
@@ -489,8 +493,17 @@ public class StandaloneDeleteHandler extends AbstractHandler {
         
         pw.write(sb.toString());
         pw.write("\r\n");
-        metas.append(sb);
-        metas.append("\n");
+        if (!metasSaturated) {
+          if (gts < MAX_LOGGED_DELETED_GTS) {
+            metas.append(sb);
+            metas.append("\n");
+          } else {
+            metasSaturated = true;
+            metas.append("...");
+            metas.append("\n");
+          }
+        }
+        
         gts++;
 
         // Log detailed metrics for this GTS owner and app
@@ -501,7 +514,13 @@ public class StandaloneDeleteHandler extends AbstractHandler {
       }
     } catch (Exception e) {
       t = e;
-      throw e;
+      // If we have not yet written anything on the output stream, call sendError
+      if (0 == gts) {
+        response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
+        return;
+      } else {
+        throw e;
+      }
     } finally {
       if (null != loggingWriter) {
         Map<String,String> labels = new HashMap<String,String>();
@@ -529,6 +548,8 @@ public class StandaloneDeleteHandler extends AbstractHandler {
       event = LogUtil.setLoggingEventAttribute(event, LogUtil.DELETION_METADATA, metas.toString());
       event = LogUtil.setLoggingEventAttribute(event, LogUtil.DELETION_COUNT, Long.toString(count));
       event = LogUtil.setLoggingEventAttribute(event, LogUtil.DELETION_GTS, Long.toString(gts));
+      
+      LogUtil.addHttpHeaders(event, request);
       
       if (null != t) {
         LogUtil.setLoggingEventStackTrace(null, LogUtil.STACK_TRACE, t);

@@ -270,8 +270,11 @@ import io.warp10.script.unary.UNIT;
 import io.warp10.warp.sdk.WarpScriptExtension;
 
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -340,6 +343,9 @@ public class WarpScriptLib {
   public static final String PARSESELECTOR = "PARSESELECTOR";
   
   public static final String GEO_WKT = "GEO.WKT";
+  public static final String GEO_WKT_UNIFORM = "GEO.WKT.UNIFORM";
+  
+  public static final String GEO_JSON = "GEO.JSON";
   public static final String GEO_INTERSECTION = "GEO.INTERSECTION";
   public static final String GEO_DIFFERENCE = "GEO.DIFFERENCE";
   public static final String GEO_UNION = "GEO.UNION";
@@ -347,6 +353,7 @@ public class WarpScriptLib {
   public static final String GEOUNPACK = "GEOUNPACK";
   
   public static final String UNWRAP = "UNWRAP";
+  public static final String UNWRAPENCODER = "UNWRAPENCODER";
   public static final String OPB64TO = "OPB64->";
   public static final String TOOPB64 = "->OPB64";
   public static final String BYTESTO = "BYTES->";
@@ -361,6 +368,8 @@ public class WarpScriptLib {
   
   public static final String RSAPUBLIC = "RSAPUBLIC";
   public static final String RSAPRIVATE = "RSAPRIVATE";
+  
+  public static final String MSGFAIL = "MSGFAIL";
   
   static {
     
@@ -382,6 +391,7 @@ public class WarpScriptLib {
     functions.put("CLEARTOMARK", new CLEARTOMARK("CLEARTOMARK"));
     functions.put("COUNTTOMARK", new COUNTTOMARK("COUNTTOMARK"));
     functions.put("AUTHENTICATE", new AUTHENTICATE("AUTHENTICATE"));
+    functions.put("ISAUTHENTICATED", new ISAUTHENTICATED("ISAUTHENTICATED"));
     functions.put("STACKATTRIBUTE", new STACKATTRIBUTE("STACKATTRIBUTE")); // NOT TO BE DOCUMENTED
     functions.put("EXPORT", new EXPORT("EXPORT"));
     functions.put("TIMINGS", new TIMINGS("TIMINGS")); // NOT TO BE DOCUMENTED (YET)
@@ -441,7 +451,9 @@ public class WarpScriptLib {
     functions.put("MAXOPS", new MAXOPS("MAXOPS"));
     functions.put("MAXLOOP", new MAXLOOP("MAXLOOP"));
     functions.put("MAXBUCKETS", new MAXBUCKETS("MAXBUCKETS"));
+    functions.put("MAXGEOCELLS", new MAXGEOCELLS("MAXGEOCELLS"));
     functions.put("MAXPIXELS", new MAXPIXELS("MAXPIXELS"));
+    functions.put("MAXRECURSION", new MAXRECURSION("MAXRECURSION"));
     functions.put("OPS", new OPS("OPS"));
     functions.put("MAXSYMBOLS", new MAXSYMBOLS("MAXSYMBOLS"));
     functions.put(EVAL, new EVAL(EVAL));
@@ -467,14 +479,18 @@ public class WarpScriptLib {
     functions.put("TYPEOF", new TYPEOF("TYPEOF"));      
     functions.put("ASSERT", new ASSERT("ASSERT"));
     functions.put("FAIL", new FAIL("FAIL"));
-    functions.put("MSGFAIL", new MSGFAIL("MSGFAIL"));
+    functions.put(MSGFAIL, new MSGFAIL(MSGFAIL));
     functions.put("STOP", new STOP("STOP"));
+    functions.put("TRY", new TRY("TRY"));
+    functions.put("RETHROW", new RETHROW("RETHROW"));
+    functions.put("ERROR", new ERROR("ERROR"));
     functions.put("JSONSTRICT", new JSONSTRICT("JSONSTRICT"));
     functions.put("JSONLOOSE", new JSONLOOSE("JSONLOOSE"));
     functions.put("DEBUGON", new DEBUGON("DEBUGON"));
     functions.put("NDEBUGON", new NDEBUGON("NDEBUGON"));
     functions.put("DEBUGOFF", new DEBUGOFF("DEBUGOFF"));
     functions.put("LMAP", new LMAP("LMAP"));
+    functions.put("NONNULL", new NONNULL("NONNULL"));
     functions.put("LFLATMAP", new LFLATMAP("LFLATMAP"));
     functions.put("[]", new EMPTYLIST("[]"));
     functions.put(LIST_START, new MARK(LIST_START));
@@ -485,20 +501,26 @@ public class WarpScriptLib {
     functions.put(MAP_START, new MARK(MAP_START));
     functions.put(MAP_END, new ENDMAP(MAP_END));
     functions.put("SECUREKEY", new SECUREKEY("SECUREKEY"));
+    functions.put("SECURE", new SECURE("SECURE"));
     functions.put("UNSECURE", new UNSECURE("UNSECURE", true));
     functions.put(EVALSECURE, new EVALSECURE(EVALSECURE));
     functions.put("NOOP", new NOOP("NOOP"));
     functions.put("DOC", new DOC("DOC"));
     functions.put("DOCMODE", new DOCMODE("DOCMODE"));
-    functions.put(SNAPSHOT, new SNAPSHOT(SNAPSHOT, false, false, true));
-    functions.put(QSNAPSHOT, new SNAPSHOT(QSNAPSHOT, false, false, true, false));
-    functions.put(SNAPSHOTALL, new SNAPSHOT(SNAPSHOTALL, true, false, true));
-    functions.put("SNAPSHOTTOMARK", new SNAPSHOT("SNAPSHOTTOMARK", false, true, true));
-    functions.put("SNAPSHOTALLTOMARK", new SNAPSHOT("SNAPSHOTALLTOMARK", true, true, true));
-    functions.put("SNAPSHOTCOPY", new SNAPSHOT("SNAPSHOTCOPY", false, false, false));
-    functions.put("SNAPSHOTCOPYALL", new SNAPSHOT("SNAPSHOTCOPYALL", true, false, false));
-    functions.put("SNAPSHOTCOPYTOMARK", new SNAPSHOT("SNAPSHOTCOPYTOMARK", false, true, false));
-    functions.put("SNAPSHOTCOPYALLTOMARK", new SNAPSHOT("SNAPSHOTCOPYALLTOMARK", true, true, false));
+
+    functions.put("SECTION", new SECTION("SECTION"));
+    functions.put("GETSECTION", new GETSECTION("GETSECTION"));
+    functions.put(SNAPSHOT, new SNAPSHOT(SNAPSHOT, false, false, true, false));
+    functions.put(SNAPSHOTALL, new SNAPSHOT(SNAPSHOTALL, true, false, true, false));
+    functions.put("SNAPSHOTTOMARK", new SNAPSHOT("SNAPSHOTTOMARK", false, true, true, false));
+    functions.put("SNAPSHOTALLTOMARK", new SNAPSHOT("SNAPSHOTALLTOMARK", true, true, true, false));
+    functions.put("SNAPSHOTCOPY", new SNAPSHOT("SNAPSHOTCOPY", false, false, false, false));
+    functions.put("SNAPSHOTCOPYALL", new SNAPSHOT("SNAPSHOTCOPYALL", true, false, false, false));
+    functions.put("SNAPSHOTCOPYTOMARK", new SNAPSHOT("SNAPSHOTCOPYTOMARK", false, true, false, false));
+    functions.put("SNAPSHOTCOPYALLTOMARK", new SNAPSHOT("SNAPSHOTCOPYALLTOMARK", true, true, false, false));
+    functions.put("SNAPSHOTN", new SNAPSHOT("SNAPSHOTN", false, false, true, true));
+    functions.put("SNAPSHOTCOPYN", new SNAPSHOT("SNAPSHOTCOPYN", false, false, false, true));
+
     functions.put("HEADER", new HEADER("HEADER"));
     
     functions.put("MACROMAPPER", new MACROMAPPER("MACROMAPPER"));
@@ -668,6 +690,12 @@ public class WarpScriptLib {
     // GTS standalone functions
     //
     
+    functions.put("NEWENCODER", new NEWENCODER("NEWENCODER"));
+    functions.put("CHUNKENCODER", new CHUNKENCODER("CHUNKENCODER", true));
+    functions.put("->ENCODER", new TOENCODER("->ENCODER"));
+    functions.put("ENCODER->", new ENCODERTO("ENCODER->"));
+    functions.put("->GTS", new TOGTS("->GTS"));
+    functions.put("OPTIMIZE", new OPTIMIZE("OPTIMIZE"));
     functions.put(NEWGTS, new NEWGTS(NEWGTS));
     functions.put("MAKEGTS", new MAKEGTS("MAKEGTS"));
     functions.put("ADDVALUE", new ADDVALUE("ADDVALUE", false));
@@ -719,6 +747,7 @@ public class WarpScriptLib {
     functions.put("FFT", new FFT.Builder("FFT", true));
     functions.put("FFTAP", new FFT.Builder("FFT", false));
     functions.put("IFFT", new IFFT.Builder("IFFT"));
+    functions.put("FFTWINDOW", new FFTWINDOW("FFTWINDOW"));
     functions.put("FDWT", new FDWT("FDWT"));
     functions.put("IDWT", new IDWT("IDWT"));
     functions.put("DWTSPLIT", new DWTSPLIT("DWTSPLIT"));
@@ -731,8 +760,10 @@ public class WarpScriptLib {
     functions.put("PATTERNDETECTION", new PATTERNDETECTION("PATTERNDETECTION", true));
     functions.put("ZPATTERNS", new PATTERNS("ZPATTERNS", false));
     functions.put("ZPATTERNDETECTION", new PATTERNDETECTION("ZPATTERNDETECTION", false));
-    functions.put("DTW", new DTW("DTW"));
+    functions.put("DTW", new DTW("DTW", true, false));
     functions.put("OPTDTW", new OPTDTW("OPTDTW"));
+    functions.put("ZDTW", new DTW("ZDTW", true, true));
+    functions.put("RAWDTW", new DTW("RAWDTW", false, false));
     functions.put("VALUEHISTOGRAM", new VALUEHISTOGRAM("VALUEHISTORGRAM"));
     functions.put("PROBABILITY", new PROBABILITY.Builder("PROBABILITY"));
     functions.put("PROB", new PROB("PROB"));
@@ -800,6 +831,7 @@ public class WarpScriptLib {
     functions.put(UNWRAP, new UNWRAP(UNWRAP));
     functions.put("UNWRAPEMPTY", new UNWRAP("UNWRAPEMPTY", true));
     functions.put("UNWRAPSIZE", new UNWRAPSIZE("UNWRAPSIZE"));
+    functions.put(UNWRAPENCODER, new UNWRAPENCODER(UNWRAPENCODER));
     
     //
     // Outlier detection
@@ -878,6 +910,11 @@ public class WarpScriptLib {
     functions.put("mapper.add", new MapperAdd.Builder("mapper.add"));
     functions.put("mapper.mul", new MapperMul.Builder("mapper.mul"));
     functions.put("mapper.pow", new MapperPow.Builder("mapper.pow"));
+    try {
+      functions.put("mapper.sqrt", new MapperPow("mapper.sqrt", 0.5D));
+    } catch (WarpScriptException wse) {
+      throw new RuntimeException(wse);
+    }
     functions.put("mapper.exp", new MapperExp.Builder("mapper.exp"));
     functions.put("mapper.log", new MapperLog.Builder("mapper.log"));
     functions.put("mapper.min.x", new MapperMinX.Builder("mapper.min.x"));          
@@ -939,7 +976,9 @@ public class WarpScriptLib {
     functions.put("->HHCODELONG", new TOHHCODE("->HHCODELONG", false));
     functions.put("HHCODE->", new HHCODETO("HHCODE->"));
     functions.put("GEO.REGEXP", new GEOREGEXP("GEO.REGEXP"));
-    functions.put(GEO_WKT, new GeoWKT(GEO_WKT));
+    functions.put(GEO_WKT, new GeoWKT(GEO_WKT, false));
+    functions.put(GEO_WKT_UNIFORM, new GeoWKT(GEO_WKT, true));
+    functions.put(GEO_JSON, new GeoJSON(GEO_JSON));
     functions.put(GEO_INTERSECTION, new GeoIntersection(GEO_INTERSECTION));
     functions.put(GEO_UNION, new GeoUnion(GEO_UNION));
     functions.put(GEO_DIFFERENCE, new GeoSubtraction(GEO_DIFFERENCE));
@@ -982,9 +1021,13 @@ public class WarpScriptLib {
     functions.put("MINLONG", new MINLONG("MINLONG"));
     functions.put("MAXLONG", new MAXLONG("MAXLONG"));
     functions.put("RAND", new RAND("RAND"));
+    functions.put("PRNG", new PRNG("PRNG"));
+    functions.put("SRAND", new SRAND("SRAND"));
 
     functions.put("NPDF", new NPDF.Builder("NPDF"));
     functions.put("MUSIGMA", new MUSIGMA("MUSIGMA"));
+    functions.put("KURTOSIS", new KURTOSIS("KURTOSIS"));
+    functions.put("SKEWNESS", new SKEWNESS("SKEWNESS"));
     functions.put("NSUMSUMSQ", new NSUMSUMSQ("NSUMSUMSQ"));
     functions.put("LR", new LR("LR"));
     functions.put("MODE", new MODE("MODE"));
@@ -1399,75 +1442,105 @@ public class WarpScriptLib {
   public static void registerExtensions() { 
     Properties props = WarpConfig.getProperties();
     
-    if (null != props && props.containsKey(Configuration.CONFIG_WARPSCRIPT_EXTENSIONS)) {
+    if (null == props) {
+      return;
+    }
+    
+    //
+    // Extract the list of extensions
+    //
+    
+    Set<String> ext = new LinkedHashSet<String>();
+    
+    if (props.containsKey(Configuration.CONFIG_WARPSCRIPT_EXTENSIONS)) {
       String[] extensions = props.getProperty(Configuration.CONFIG_WARPSCRIPT_EXTENSIONS).split(",");
-      Set<String> ext = new HashSet<String>();
       
       for (String extension: extensions) {
         ext.add(extension.trim());
       }
-      
-      boolean failedExt = false;
-      
-      //
-      // Determine the possible jar from which WarpScriptLib was loaded
-      //
-      
-      String wsljar = null;
-      URL wslurl = WarpScriptLib.class.getResource('/' + WarpScriptLib.class.getCanonicalName().replace('.',  '/') + ".class");
-      if (null != wslurl && "jar".equals(wslurl.getProtocol())) {
-        wsljar = wslurl.toString().replaceAll("!/.*", "").replaceAll("jar:file:", "");
+    }
+    
+    for (Object key: props.keySet()) {
+      if (!key.toString().startsWith(Configuration.CONFIG_WARPSCRIPT_EXTENSION_PREFIX)) {
+        continue;
       }
       
-      for (String extension: ext) {
-        try {
-          //
-          // Locate the class using the current class loader
-          //
-          
-          URL url = WarpScriptLib.class.getResource('/' + extension.replace('.', '/') + ".class");
-          
-          if (null == url) {
-            LOG.error("Unable to load extension '" + extension + "', make sure it is in the class path.");
-            failedExt = true;
-            continue;
-          }
-          
-          Class cls = null;
-
-          //
-          // If the class was located in a jar, load it using a specific class loader
-          // so we can have fat jars with specific deps, unless the jar is the same as
-          // the one from which WarpScriptLib was loaded, in which case we use the same
-          // class loader.
-          //
-          
-          if ("jar".equals(url.getProtocol())) {
-            String jarfile = url.toString().replaceAll("!/.*", "").replaceAll("jar:file:", "");
-
-            ClassLoader cl = WarpScriptLib.class.getClassLoader();
+      ext.add(props.get(key).toString().trim());
+    }
+    
+    // Sort the extensions
+    List<String> sortedext = new ArrayList<String>(ext);
+    sortedext.sort(null);
+    
+    boolean failedExt = false;
+      
+    //
+    // Determine the possible jar from which WarpScriptLib was loaded
+    //
+      
+    String wsljar = null;
+    URL wslurl = WarpScriptLib.class.getResource('/' + WarpScriptLib.class.getCanonicalName().replace('.',  '/') + ".class");
+    if (null != wslurl && "jar".equals(wslurl.getProtocol())) {
+      wsljar = wslurl.toString().replaceAll("!/.*", "").replaceAll("jar:file:", "");
+    }
+      
+    for (String extension: sortedext) {
+      
+      // If the extension name contains '#', remove everything up to the last '#', this was used as a sorting prefix
             
-            // If the jar differs from that from which WarpScriptLib was loaded, create a dedicated class loader
-            if (!jarfile.equals(wsljar)) {
-              cl = new WarpClassLoader(jarfile, WarpScriptLib.class.getClassLoader());
-            }
-          
-            cls = Class.forName(extension, true, cl);
-          } else {
-            cls = Class.forName(extension, true, WarpScriptLib.class.getClassLoader());
-          }
-
-          //Class cls = Class.forName(extension);
-          WarpScriptExtension wse = (WarpScriptExtension) cls.newInstance();          
-          wse.register();
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
+      if (extension.contains("#")) {
+        extension = extension.replaceAll("^.*#", "");
       }
       
-      if (failedExt) {
-        throw new RuntimeException("Some WarpScript extensions could not be loaded, aborting.");
+      try {
+        //
+        // Locate the class using the current class loader
+        //
+        
+        URL url = WarpScriptLib.class.getResource('/' + extension.replace('.', '/') + ".class");
+        
+        if (null == url) {
+          LOG.error("Unable to load extension '" + extension + "', make sure it is in the class path.");
+          failedExt = true;
+          continue;
+        }
+        
+        Class cls = null;
+
+        //
+        // If the class was located in a jar, load it using a specific class loader
+        // so we can have fat jars with specific deps, unless the jar is the same as
+        // the one from which WarpScriptLib was loaded, in which case we use the same
+        // class loader.
+        //
+        
+        if ("jar".equals(url.getProtocol())) {
+          String jarfile = url.toString().replaceAll("!/.*", "").replaceAll("jar:file:", "");
+
+          ClassLoader cl = WarpScriptLib.class.getClassLoader();
+          
+          // If the jar differs from that from which WarpScriptLib was loaded, create a dedicated class loader
+          if (!jarfile.equals(wsljar)) {
+            cl = new WarpClassLoader(jarfile, WarpScriptLib.class.getClassLoader());
+          }
+        
+          cls = Class.forName(extension, true, cl);
+        } else {
+          cls = Class.forName(extension, true, WarpScriptLib.class.getClassLoader());
+        }
+
+        //Class cls = Class.forName(extension);
+        WarpScriptExtension wse = (WarpScriptExtension) cls.newInstance();          
+        wse.register();
+        
+        System.out.println("LOADED extension '" + extension  + "'");
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
+    }
+    
+    if (failedExt) {
+      throw new RuntimeException("Some WarpScript extensions could not be loaded, aborting.");
     }
   }
   

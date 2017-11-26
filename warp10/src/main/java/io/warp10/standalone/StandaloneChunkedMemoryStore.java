@@ -16,6 +16,7 @@
 
 package io.warp10.standalone;
 
+import io.warp10.CapacityExtractorOutputStream;
 import io.warp10.continuum.TimeSource;
 import io.warp10.continuum.gts.GTSDecoder;
 import io.warp10.continuum.gts.GTSEncoder;
@@ -499,6 +500,9 @@ public class StandaloneChunkedMemoryStore extends Thread implements StoreClient 
     
     Configuration conf = new Configuration();
         
+    conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+    conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+
     BytesWritable key = new BytesWritable();
     BytesWritable value = new BytesWritable();
     
@@ -533,7 +537,10 @@ public class StandaloneChunkedMemoryStore extends Thread implements StoreClient 
           
           ByteBuffer bb = decoder.getBuffer();
           
-          value.set(bb.array(), bb.arrayOffset(), bb.remaining());
+          ByteBuffer rwbb = ByteBuffer.allocate(bb.remaining());
+          rwbb.put(bb);
+          rwbb.rewind();
+          value.set(rwbb.array(), rwbb.arrayOffset(), rwbb.remaining());
 
           bytes += key.getLength() + value.getLength();
           
@@ -577,6 +584,9 @@ public class StandaloneChunkedMemoryStore extends Thread implements StoreClient 
     
     Configuration conf = new Configuration();
         
+    conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+    conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+    
     BytesWritable key = new BytesWritable();
     BytesWritable value = new BytesWritable();
     
@@ -585,6 +595,8 @@ public class StandaloneChunkedMemoryStore extends Thread implements StoreClient 
     SequenceFile.Reader.Option optPath = SequenceFile.Reader.file(new Path(path));    
     
     SequenceFile.Reader reader = null;
+    
+    boolean failsafe = "true".equals(properties.getProperty(io.warp10.continuum.Configuration.STANDALONE_MEMORY_STORE_LOAD_FAILSAFE));
     
     try {
       reader = new SequenceFile.Reader(conf, optPath);
@@ -609,9 +621,17 @@ public class StandaloneChunkedMemoryStore extends Thread implements StoreClient 
       System.err.println("File '" + path + "' was not found, skipping.");
       return;
     } catch (IOException ioe) {
-      throw ioe;
+      if (!failsafe) {
+        throw ioe;
+      } else {
+        System.err.println("Ignoring exception " + ioe.getMessage() + ".");
+      }
     } catch (Exception e) {
-      throw new IOException(e);
+      if (!failsafe) {
+        throw new IOException(e);
+      } else {
+        System.err.println("Ignoring exception " + e.getMessage() + ".");
+      }
     }
     
     reader.close();    

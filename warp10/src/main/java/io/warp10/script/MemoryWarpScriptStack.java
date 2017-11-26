@@ -195,6 +195,7 @@ public class MemoryWarpScriptStack implements WarpScriptStack, Progressable {
       setAttribute(WarpScriptStack.ATTRIBUTE_URLFETCH_SIZE, new AtomicLong(0L));
       setAttribute(WarpScriptStack.ATTRIBUTE_URLFETCH_LIMIT, Long.parseLong(properties.getProperty(Configuration.WARPSCRIPT_URLFETCH_LIMIT, Long.toString(WarpScriptStack.DEFAULT_URLFETCH_LIMIT))));
       setAttribute(WarpScriptStack.ATTRIBUTE_URLFETCH_MAXSIZE, Long.parseLong(properties.getProperty(Configuration.WARPSCRIPT_URLFETCH_MAXSIZE, Long.toString(WarpScriptStack.DEFAULT_URLFETCH_MAXSIZE))));
+      setAttribute(WarpScriptStack.ATTRIBUTE_MAX_GEOCELLS, Long.parseLong(properties.getProperty(Configuration.WARPSCRIPT_MAX_GEOCELLS, Integer.toString(WarpScriptStack.DEFAULT_MAX_GEOCELLS))));
 
       //
       // Set hard limits
@@ -212,6 +213,12 @@ public class MemoryWarpScriptStack implements WarpScriptStack, Progressable {
       setAttribute(WarpScriptStack.ATTRIBUTE_URLFETCH_LIMIT_HARD, Long.parseLong(properties.getProperty(Configuration.WARPSCRIPT_URLFETCH_LIMIT_HARD, Long.toString(WarpScriptStack.DEFAULT_URLFETCH_LIMIT))));
       setAttribute(WarpScriptStack.ATTRIBUTE_URLFETCH_MAXSIZE_HARD, Long.parseLong(properties.getProperty(Configuration.WARPSCRIPT_URLFETCH_MAXSIZE_HARD, Long.toString(WarpScriptStack.DEFAULT_URLFETCH_MAXSIZE))));
 
+      //
+      // Set top level section name
+      //
+      
+      setAttribute(WarpScriptStack.ATTRIBUTE_SECTION_NAME, WarpScriptStack.TOP_LEVEL_SECTION);
+      
       //
       // Initialize counters
       //
@@ -239,6 +246,7 @@ public class MemoryWarpScriptStack implements WarpScriptStack, Progressable {
     setAttribute(WarpScriptStack.ATTRIBUTE_MAX_PIXELS, Long.MAX_VALUE - 1);
     setAttribute(WarpScriptStack.ATTRIBUTE_URLFETCH_LIMIT, Long.MAX_VALUE - 1);
     setAttribute(WarpScriptStack.ATTRIBUTE_URLFETCH_MAXSIZE, Long.MAX_VALUE - 1);
+    setAttribute(WarpScriptStack.ATTRIBUTE_MAX_GEOCELLS, Long.MAX_VALUE - 1);
   }
   
   @Override
@@ -734,7 +742,9 @@ public class MemoryWarpScriptStack implements WarpScriptStack, Progressable {
             Object o = load(stmt.substring(1));
             
             if (null == o) {
-              throw new WarpScriptException("Unknown symbol '" + stmt.substring(1) + "'");
+              if (!getSymbolTable().containsKey(stmt.substring(1))) {
+                throw new WarpScriptException("Unknown symbol '" + stmt.substring(1) + "'");
+              }
             }
             
             push(o);
@@ -749,7 +759,9 @@ public class MemoryWarpScriptStack implements WarpScriptStack, Progressable {
           Object o = load(stmt.substring(2));
           
           if (null == o) {
-            throw new WarpScriptException("Unknown symbol '" + stmt.substring(2) + "'");
+            if (!getSymbolTable().containsKey(stmt.substring(2))) {
+              throw new WarpScriptException("Unknown symbol '" + stmt.substring(2) + "'");
+            }
           }
 
           if (macros.isEmpty()) {
@@ -840,6 +852,12 @@ public class MemoryWarpScriptStack implements WarpScriptStack, Progressable {
     boolean secure = Boolean.TRUE.equals(this.getAttribute(WarpScriptStack.ATTRIBUTE_IN_SECURE_MACRO));
     
     //
+    // Save current section name
+    //
+    
+    String sectionname = (String) this.getAttribute(WarpScriptStack.ATTRIBUTE_SECTION_NAME);
+    
+    //
     // If we are already in a secure macro, stay in this mode, otherwise an inner macro could lower the
     // secure level
     //
@@ -887,11 +905,14 @@ public class MemoryWarpScriptStack implements WarpScriptStack, Progressable {
       if (macro.isSecure()) {
         throw ee;
       } else {
-        throw new WarpScriptException("Exception at statement '" + macro.get(i).toString() + "' (" + ee.getMessage() + ")");
+        String section = (String) this.getAttribute(WarpScriptStack.ATTRIBUTE_SECTION_NAME);
+        throw new WarpScriptException("Exception at statement '" + macro.get(i).toString() + "' in section '" + section + "' (" + ee.getMessage() + ")", ee);
       }
     } finally {
       this.setAttribute(WarpScriptStack.ATTRIBUTE_IN_SECURE_MACRO, secure);
       recurseOut();
+      // Restore section name
+      this.setAttribute(WarpScriptStack.ATTRIBUTE_SECTION_NAME, sectionname);
     }
   }
   
@@ -1043,7 +1064,7 @@ public class MemoryWarpScriptStack implements WarpScriptStack, Progressable {
   public Object load(String symbol) {
     return this.symbolTable.get(symbol);
   }
-  
+    
   @Override
   public void store(String symbol, Object value) throws WarpScriptException {
     

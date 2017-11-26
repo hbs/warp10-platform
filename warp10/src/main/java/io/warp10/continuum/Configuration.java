@@ -76,6 +76,11 @@ public class Configuration {
   public static final String CONFIG_WARPSCRIPT_EXTENSIONS = "warpscript.extensions";
   
   /**
+   * Prefix for properties which defined WarpScript extensions
+   */
+  public static final String CONFIG_WARPSCRIPT_EXTENSION_PREFIX = "warpscript.extension.";
+  
+  /**
    * This configuration parameter determines if undefining a function (via NULL 'XXX' DEF)
    * will unshadow the original statement thus making it available again or if it will replace
    * it with a function that will fail with a message saying the function is undefined.
@@ -85,6 +90,7 @@ public class Configuration {
   
   public static final String WARPSCRIPT_MAX_OPS = "warpscript.maxops";
   public static final String WARPSCRIPT_MAX_BUCKETS = "warpscript.maxbuckets";
+  public static final String WARPSCRIPT_MAX_GEOCELLS = "warpscript.geocells";
   public static final String WARPSCRIPT_MAX_DEPTH = "warpscript.maxdepth";
   public static final String WARPSCRIPT_MAX_FETCH = "warpscript.maxfetch";
   public static final String WARPSCRIPT_MAX_GTS = "warpscript.maxgts";
@@ -99,6 +105,7 @@ public class Configuration {
   // Hard limits for the above limits which can be changed via a function call
   public static final String WARPSCRIPT_MAX_OPS_HARD = "warpscript.maxops.hard";
   public static final String WARPSCRIPT_MAX_BUCKETS_HARD = "warpscript.maxbuckets.hard";
+  public static final String WARPSCRIPT_MAX_GEOCELLS_HARD = "warpscript.maxgeocells.hard";
   public static final String WARPSCRIPT_MAX_DEPTH_HARD = "warpscript.maxdepth.hard";
   public static final String WARPSCRIPT_MAX_FETCH_HARD = "warpscript.maxfetch.hard";
   public static final String WARPSCRIPT_MAX_GTS_HARD = "warpscript.maxgts.hard";
@@ -790,6 +797,11 @@ public class Configuration {
   public static final String STORE_KAFKA_DATA_GROUPID = "store.kafka.data.groupid";
 
   /**
+   * A prefix prepended to the Kafka ConsumerId
+   */
+  public static final String STORE_KAFKA_DATA_CONSUMERID_PREFIX = "store.kafka.data.consumerid.prefix";
+
+  /**
    * Client id to use to consume the data topic
    */
   public static final String STORE_KAFKA_DATA_CONSUMER_CLIENTID = "store.kafka.data.consumer.clientid";
@@ -1380,6 +1392,21 @@ public class Configuration {
   public static final String DATALOG_FORWARDER_ENDPOINT_META = "datalog.forwarder.endpoint.meta";
   
   /**
+   * Set to 'true' to disable plasma
+   */
+  public static final String WARP_PLASMA_DISABLE = "warp.plasma.disable";
+
+  /**
+   * Set to 'true' to disable mobius
+   */
+  public static final String WARP_MOBIUS_DISABLE = "warp.mobius.disable";
+
+  /**
+   * Set to 'true' to disable stream updates
+   */
+  public static final String WARP_STREAMUPDATE_DISABLE = "warp.streamupdate.disable";
+
+  /**
    * Set to 'true' to indicate the instance will use memory only for storage. This type of instance is non persistent.
    */
   public static final String IN_MEMORY = "in.memory";
@@ -1429,6 +1456,11 @@ public class Configuration {
    * Path to a dump file in which the current state of an in-memory Warp 10 will be persisted.
    */
   public static final String STANDALONE_MEMORY_STORE_DUMP = "in.memory.dump";
+  
+  /**
+   * Set to true to tolerate errors while loading a dumped state. Setting this to true can lead to partial data being loaded.
+   */
+  public static final String STANDALONE_MEMORY_STORE_LOAD_FAILSAFE = "in.memory.load.failsafe";
   
   /**
    * How often (in ms) to perform a gc of the in-memory store.
@@ -1824,12 +1856,20 @@ public class Configuration {
    */
   public static final String WARPSCRIPT_CALL_MAXCAPACITY = "warpscript.call.maxcapacity";
       
-  //
-  // Macro Repository
-  //
-  
+  /**
+   * Macro Repository root directory
+   */  
   public static final String REPOSITORY_DIRECTORY = "warpscript.repository.directory";
+  
+  /**
+   * Macro repository refresh interval (in ms)
+   */
   public static final String REPOSITORY_REFRESH = "warpscript.repository.refresh";
+
+  /**
+   * Should new macros be loaded on demand?
+   */
+  public static final String REPOSITORY_ONDEMAND = "warpscript.repository.ondemand";
 
   /**
    * Header containing the request UUID when calling the endpoint

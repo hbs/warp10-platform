@@ -18,12 +18,15 @@ package io.warp10.script;
 
 import io.warp10.FloatUtils;
 import io.warp10.WarpURLEncoder;
+import io.warp10.continuum.gts.GTSDecoder;
+import io.warp10.continuum.gts.GTSEncoder;
 import io.warp10.continuum.gts.GTSHelper;
 import io.warp10.continuum.gts.GeoTimeSerie;
 import io.warp10.continuum.gts.UnsafeString;
 import io.warp10.continuum.gts.GeoTimeSerie.TYPE;
 import io.warp10.continuum.store.thrift.data.Metadata;
 import io.warp10.script.WarpScriptStack.Macro;
+import io.warp10.script.functions.SNAPSHOT.Snapshotable;
 import io.warp10.warp.sdk.WarpScriptJavaFunctionGTS;
 
 import java.io.BufferedReader;
@@ -181,6 +184,56 @@ public class StackUtils {
       }
       out.print("]");
       out.print("}");
+    } else if (o instanceof GTSEncoder) {
+      out.print("{");
+      out.print("\"c\":");
+      //out.print(gson.toJson(((GeoTimeSerie) o).getMetadata().getName()));
+      String name = ((GTSEncoder) o).getMetadata().getName();
+      if (null == name) {
+        name = "";
+      }
+      out.print(serializer.serialize(name));
+      out.print(",\"l\":");
+      objectToJSON(out, ((GTSEncoder) o).getMetadata().getLabels(), recursionLevel, strictJSON);
+      out.print(",\"a\":");
+      objectToJSON(out, ((GTSEncoder) o).getMetadata().getAttributes(), recursionLevel, strictJSON);
+      out.print(",\"v\":[");
+      boolean first = true;
+      GTSDecoder decoder = ((GTSEncoder) o).getUnsafeDecoder(false);
+      while(decoder.next()) {
+        if (!first) {
+          out.print(",");
+        }
+        long ts = decoder.getTimestamp();
+        long location = decoder.getLocation();
+        long elevation = decoder.getElevation();
+        Object v = decoder.getValue();
+        out.print("[");
+        out.print(ts);
+        if (GeoTimeSerie.NO_LOCATION != location) {
+          double[] latlon = GeoXPLib.fromGeoXPPoint(location);
+          out.print(",");
+          out.print(latlon[0]);
+          out.print(",");
+          out.print(latlon[1]);
+        }
+        if (GeoTimeSerie.NO_ELEVATION != elevation) {
+          out.print(",");
+          out.print(elevation);
+        }
+        out.print(",");
+        //out.print(gson.toJson(v));    
+        if (strictJSON && (v instanceof Double) && (Double.isNaN((double) v) || Double.isInfinite((double) v))) {
+          out.print("null");
+        } else {
+          out.print(serializer.serialize(v));
+        }
+        out.print("]");
+        first = false;
+      }
+      out.print("]");
+      out.print("}");
+      
     } else if (o instanceof Metadata) {
       out.print("{");
       out.print("\"c\":");
@@ -625,6 +678,8 @@ public class StackUtils {
       sb.append(Boolean.toString((boolean) o));
     } else if (o instanceof WarpScriptStackFunction) {
       sb.append(o.toString());
+    } else if (o instanceof Snapshotable) {
+      ((Snapshotable) o).snapshot();
     } else if (o instanceof Macro) {
       sb.append(o.toString());
     } else if (o instanceof NamedWarpScriptFunction){
