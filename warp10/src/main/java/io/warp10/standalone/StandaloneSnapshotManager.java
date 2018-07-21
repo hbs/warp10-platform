@@ -77,7 +77,7 @@ public class StandaloneSnapshotManager extends Thread {
       // Trigger path exists, suspend compactions
       //
       
-      DB db = Warp.getDB();
+      WarpDB db = Warp.getDB();
       
       synchronized(db) {
         

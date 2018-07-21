@@ -67,7 +67,7 @@ public class Warp extends WarpDist implements Runnable {
     
   private static final String NULL = "null";
         
-  private static DB db;
+  private static WarpDB db;
   
   private static boolean standaloneMode = false;
   
@@ -230,21 +230,8 @@ public class Warp extends WarpDist implements Runnable {
     if (!inmemory && !nullbackend && !plasmabackend) {
       boolean nativedisabled = "true".equals(properties.getProperty(Configuration.LEVELDB_NATIVE_DISABLE));
       boolean javadisabled = "true".equals(properties.getProperty(Configuration.LEVELDB_JAVA_DISABLE));
-      try {
-        if (!nativedisabled) {
-          db = JniDBFactory.factory.open(new File(properties.getProperty(Configuration.LEVELDB_HOME)), options);
-        } else {
-          throw new UnsatisfiedLinkError("Native LevelDB implementation disabled.");
-        }
-      } catch (UnsatisfiedLinkError ule) {
-        ule.printStackTrace();
-        if (!javadisabled) {
-          System.out.println("WARNING: falling back to pure java implementation of LevelDB.");
-          db = Iq80DBFactory.factory.open(new File(properties.getProperty(Configuration.LEVELDB_HOME)), options);
-        } else {
-          throw new RuntimeException("No usable LevelDB implementation, aborting.");
-        }
-      }      
+      String home = properties.getProperty(Configuration.LEVELDB_HOME);
+      db = new WarpDB(nativedisabled, javadisabled, home, options);
     }
 
     // Register shutdown hook to close the DB.
@@ -548,7 +535,7 @@ public class Warp extends WarpDist implements Runnable {
     }
   }  
 
-  public static DB getDB() {
+  public static WarpDB getDB() {
     return db;
   }
 }

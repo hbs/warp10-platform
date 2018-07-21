@@ -16,7 +16,6 @@
 
 package io.warp10.standalone;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -25,28 +24,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.commons.codec.binary.Hex;
-import org.apache.hadoop.hbase.zookeeper.DeletionListener;
-import org.fusesource.leveldbjni.JniDBFactory;
-import org.iq80.leveldb.DB;
-import org.iq80.leveldb.Options;
-import org.iq80.leveldb.impl.DbImpl;
 import org.iq80.leveldb.impl.FileMetaData;
-import org.iq80.leveldb.impl.Filename;
-import org.iq80.leveldb.impl.InternalKey;
-import org.iq80.leveldb.impl.Iq80DBFactory;
 import org.iq80.leveldb.impl.LogReader;
-import org.iq80.leveldb.impl.LogWriter;
-import org.iq80.leveldb.impl.Logs;
-import org.iq80.leveldb.impl.ValueType;
 import org.iq80.leveldb.impl.VersionEdit;
 import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SliceOutput;
-import org.iq80.leveldb.util.Slices;
-
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
-
-import io.warp10.continuum.Configuration;
 
 /**
  * Reads a MANIFEST file and outputs a report about each .sst file
