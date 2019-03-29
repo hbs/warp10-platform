@@ -248,6 +248,7 @@ import io.warp10.script.processing.image.PnoTint;
 import io.warp10.script.processing.image.Ppixels;
 import io.warp10.script.processing.image.Pset;
 import io.warp10.script.processing.image.Ptint;
+import io.warp10.script.processing.image.PtoImage;
 import io.warp10.script.processing.image.PupdatePixels;
 import io.warp10.script.processing.math.Pconstrain;
 import io.warp10.script.processing.math.Pdist;
@@ -634,6 +635,10 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new REF(REF));
 
     addNamedWarpScriptFunction(new MACROTTL("MACROTTL"));
+    addNamedWarpScriptFunction(new WFON("WFON"));
+    addNamedWarpScriptFunction(new WFOFF("WFOFF"));
+    addNamedWarpScriptFunction(new SETMACROCONFIG("SETMACROCONFIG"));
+    addNamedWarpScriptFunction(new MACROCONFIGSECRET("MACROCONFIGSECRET"));
     addNamedWarpScriptFunction(new MACROCONFIG("MACROCONFIG", false));
     addNamedWarpScriptFunction(new MACROCONFIG("MACROCONFIGDEFAULT", true));
     addNamedWarpScriptFunction(new MACROMAPPER("MACROMAPPER"));
@@ -700,6 +705,7 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new FROMBIN("FROMBIN"));
     addNamedWarpScriptFunction(new TOBITS("TOBITS", false));
     addNamedWarpScriptFunction(new FROMBITS("FROMBITS", false));
+    addNamedWarpScriptFunction(new TOLONGBYTES("->LONGBYTES"));
     addNamedWarpScriptFunction(new TOBITS("->DOUBLEBITS", false));
     addNamedWarpScriptFunction(new FROMBITS("DOUBLEBITS->", false));
     addNamedWarpScriptFunction(new TOBITS("->FLOATBITS", true));
@@ -1240,9 +1246,9 @@ public class WarpScriptLib {
     //
     // Processing
     //
-    
+
     addNamedWarpScriptFunction(new Pencode("Pencode"));
-    
+
     // Structure
     
     addNamedWarpScriptFunction(new PpushStyle("PpushStyle"));
@@ -1339,6 +1345,7 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new PnoTint("PnoTint"));
     addNamedWarpScriptFunction(new Ppixels("Ppixels"));
     addNamedWarpScriptFunction(new PupdatePixels("PupdatePixels"));
+    addNamedWarpScriptFunction(new PtoImage("PtoImage"));
     
     // TODO(hbs): support texture related functions?
     
