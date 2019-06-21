@@ -428,6 +428,10 @@ warpscript.delete.endpoint = http://127.0.0.1:8080/api/v0/delete
 #warpscript.extension.rexec = io.warp10.script.ext.rexec.RexecWarpScriptExtension
 // Comma separated list of included and excluded (! prefixed) host patterns
 #warpscript.rexec.endpoint.patterns = .*
+// REXEC connect timeout in ms (default = 0, no timeout)
+#warpscript.rexec.timeout.connect = 0
+// REXEC read timeout in ms (default = 0, no timeout)
+#warpscript.rexec.timeout.read = 0
 // SENSISIONEVENT, SENSISIONGET, SENSISIONSET, SENSISIONUPDATE
 #warpscript.extension.sensision = io.warp10.script.ext.sensision.SensisionWarpScriptExtension
 // MUTEX, SHMLOAD, SHMSTORE
@@ -1038,9 +1042,14 @@ ingress.kafka.metadata.maxsize = 900000
 #ingress.kafka.data.producer.clientid =
 
 //
-// Do we send Metadata in the Kafka message for delete operations?
+// Do we send Metadata in the Kafka message for delete operations? (defaults to false)
 //
 #ingress.delete.metadata.include =
+
+//
+// Do we send Metadata in the Kafka message for store operations? (defaults to false)
+//
+#ingress.store.metadata.include =
 
 //
 // Request timeout when talking to Kafka
@@ -1863,6 +1872,10 @@ throttling.manager.period = 1000
 #http.period = 60000
 // Size of the queue to use for the Jetty thread pool. By default no queue is used
 #http.queuesize = 8
+// Set to false to disable support for gzipped responses
+#http.gzip = false
+// Set to true to convert header names to lower case in the request map
+#http.lcheaders = true
 
 //
 // UDP Plugin

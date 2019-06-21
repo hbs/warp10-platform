@@ -57,10 +57,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
-
 import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
@@ -267,6 +263,7 @@ public class Ingress extends AbstractHandler implements Runnable {
   private final long[] siphashDataKey;
 
   private final boolean sendMetadataOnDelete;
+  private final boolean sendMetadataOnStore;
 
   private final KafkaSynchronizedConsumerPool  pool;
   
@@ -351,6 +348,7 @@ public class Ingress extends AbstractHandler implements Runnable {
     this.siphashDataKey = SipHashInline.getKey(this.keystore.getKey(KeyStore.SIPHASH_KAFKA_DATA));    
 
     this.sendMetadataOnDelete = Boolean.parseBoolean(props.getProperty(Configuration.INGRESS_DELETE_METADATA_INCLUDE, "false"));
+    this.sendMetadataOnStore = Boolean.parseBoolean(props.getProperty(Configuration.INGRESS_STORE_METADATA_INCLUDE, "false"));
 
     this.parseAttributes = "true".equals(props.getProperty(Configuration.INGRESS_PARSE_ATTRIBUTES));
     
@@ -635,6 +633,9 @@ public class Ingress extends AbstractHandler implements Runnable {
       
       try {
         writeToken = Tokens.extractWriteToken(token);
+        if (writeToken.getAttributesSize() > 0 && writeToken.getAttributes().containsKey(Constants.TOKEN_ATTR_NOUPDATE)) {
+          throw new WarpScriptException("Token cannot be used for updating data.");
+        }
       } catch (WarpScriptException ee) {
         throw new IOException(ee);
       }
@@ -989,6 +990,9 @@ public class Ingress extends AbstractHandler implements Runnable {
     try {
       try {
         writeToken = Tokens.extractWriteToken(token);
+        if (writeToken.getAttributesSize() > 0 && writeToken.getAttributes().containsKey(Constants.TOKEN_ATTR_NOMETA)) {
+          throw new WarpScriptException("Token cannot be used for updating metadata.");
+        }
       } catch (WarpScriptException ee) {
         throw new IOException(ee);
       }
@@ -1156,13 +1160,13 @@ public class Ingress extends AbstractHandler implements Runnable {
     
     try {
       writeToken = Tokens.extractWriteToken(token);
+      if (writeToken.getAttributesSize() > 0 && writeToken.getAttributes().containsKey(Constants.TOKEN_ATTR_NODELETE)) {
+        throw new WarpScriptException("Token cannot be used for deletions.");
+      }
     } catch (WarpScriptException ee) {
       throw new IOException(ee);
     }
     
-    if (writeToken.getAttributesSize() > 0 && writeToken.getAttributes().containsKey(Constants.TOKEN_ATTR_NODELETE)) {
-      throw new IOException("Token cannot be used for deletions.");
-    }
     
     String application = writeToken.getAppName();
     String producer = Tokens.getUUID(writeToken.getProducerId());
@@ -1787,6 +1791,10 @@ public class Ingress extends AbstractHandler implements Runnable {
       msg.setData(encoder.getBytes());
       msg.setClassId(encoder.getClassId());
       msg.setLabelsId(encoder.getLabelsId());
+
+      if (this.sendMetadataOnStore) {
+        msg.setMetadata(encoder.getMetadata());
+      }
 
       sendDataMessage(msg);
     } else {

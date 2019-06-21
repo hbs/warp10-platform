@@ -612,6 +612,11 @@ public class Configuration {
   public static final String INGRESS_DELETE_METADATA_INCLUDE = "ingress.delete.metadata.include";
 
   /**
+   * Do we send Metadata in the Kafka message for store operations?
+   */
+  public static final String INGRESS_STORE_METADATA_INCLUDE = "ingress.store.metadata.include";
+
+  /**
    * Host onto which the ingress server should listen
    */
   public static final String INGRESS_HOST = "ingress.host";
@@ -1423,6 +1428,11 @@ public class Configuration {
    * Directory where data requests should be logged. This directory should be in 700 to protect sensitive token infos.
    */
   public static final String DATALOG_DIR = "datalog.dir";
+  
+  /**
+   * Set to true to call fsync when closing datalog files
+   */
+  public static final String DATALOG_SYNC = "datalog.sync";
   
   /**
    * Id of this datalog node. The id will be used in the file name and will be passed down to child nodes via

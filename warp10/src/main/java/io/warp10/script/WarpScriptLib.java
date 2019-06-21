@@ -49,8 +49,7 @@ import io.warp10.continuum.gts.LOCATIONOFFSET;
 import io.warp10.continuum.gts.ZIP;
 import io.warp10.script.WarpScriptStack.Macro;
 import io.warp10.script.aggregator.And;
-import io.warp10.script.aggregator.Argmax;
-import io.warp10.script.aggregator.Argmin;
+import io.warp10.script.aggregator.Argminmax;
 import io.warp10.script.aggregator.CircularMean;
 import io.warp10.script.aggregator.Count;
 import io.warp10.script.aggregator.Delta;
@@ -555,6 +554,7 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new DEFINED("DEFINED"));
     addNamedWarpScriptFunction(new REDEFS("REDEFS"));
     addNamedWarpScriptFunction(new DEFINEDMACRO("DEFINEDMACRO"));
+    addNamedWarpScriptFunction(new DEFINEDMACRO("CHECKMACRO", true));
     addNamedWarpScriptFunction(new NaN("NaN"));
     addNamedWarpScriptFunction(new ISNaN("ISNaN"));
     addNamedWarpScriptFunction(new TYPEOF("TYPEOF"));
@@ -903,6 +903,8 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new LTTB("TLTTB", true));
     addNamedWarpScriptFunction(new LOCATIONOFFSET("LOCATIONOFFSET"));
     addNamedWarpScriptFunction(new FLATTEN("FLATTEN"));
+    addNamedWarpScriptFunction(new RESHAPE("RESHAPE"));
+    addNamedWarpScriptFunction(new SHAPE("SHAPE"));
     addNamedWarpScriptFunction(new CORRELATE.Builder("CORRELATE"));
     addNamedWarpScriptFunction(new SORT("SORT"));
     addNamedWarpScriptFunction(new SORTBY("SORTBY"));
@@ -912,6 +914,7 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new VALUESORT("VALUESORT"));
     addNamedWarpScriptFunction(new RVALUESORT("RVALUESORT"));
     addNamedWarpScriptFunction(new LSORT("LSORT"));
+    addNamedWarpScriptFunction(new SHUFFLE("SHUFFLE"));
     addNamedWarpScriptFunction(new MSORT("MSORT"));
     addNamedWarpScriptFunction(new GROUPBY("GROUPBY"));
     addNamedWarpScriptFunction(new FILTERBY("FILTERBY"));
@@ -955,6 +958,7 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new COMMONTICKS("COMMONTICKS"));
     addNamedWarpScriptFunction(new WRAP("WRAP"));
     addNamedWarpScriptFunction(new WRAPRAW("WRAPRAW"));
+    addNamedWarpScriptFunction(new WRAPRAW("WRAPFAST", false, false));
     addNamedWarpScriptFunction(new WRAP("WRAPOPT", true));
     addNamedWarpScriptFunction(new WRAPRAW("WRAPRAWOPT", true));
     addNamedWarpScriptFunction(new UNWRAP(UNWRAP));
@@ -1505,8 +1509,8 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new Variance.Builder("reducer.var.forbid-nulls", false));
     addNamedWarpScriptFunction(new StandardDeviation.Builder("reducer.sd", false));
     addNamedWarpScriptFunction(new StandardDeviation.Builder("reducer.sd.forbid-nulls", false));
-    addNamedWarpScriptFunction(new Argmin.Builder("reducer.argmin"));
-    addNamedWarpScriptFunction(new Argmax.Builder("reducer.argmax"));
+    addNamedWarpScriptFunction(new Argminmax.Builder("reducer.argmin", true));
+    addNamedWarpScriptFunction(new Argminmax.Builder("reducer.argmax", false));
     addNamedWarpScriptFunction(new MapperProduct("reducer.product"));
     addNamedWarpScriptFunction(new Count("reducer.count", false));
     addNamedWarpScriptFunction(new Count("reducer.count.include-nulls", false));

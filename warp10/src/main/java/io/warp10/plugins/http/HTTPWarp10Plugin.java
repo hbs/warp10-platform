@@ -16,11 +16,14 @@
 package io.warp10.plugins.http;
 
 import com.google.common.base.Charsets;
+
+import io.warp10.continuum.egress.EgressExecHandler;
 import io.warp10.script.MemoryWarpScriptStack;
 import io.warp10.script.WarpScriptStack.Macro;
 import io.warp10.warp.sdk.AbstractWarp10Plugin;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.util.BlockingArrayQueue;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.slf4j.Logger;
@@ -72,7 +75,8 @@ public class HTTPWarp10Plugin extends AbstractWarp10Plugin implements Runnable {
   private static final String CONF_HTTP_MAXTHREADS = "http.maxthreads";
   private static final String CONF_HTTP_IDLE_TIMEOUT = "http.idle.timeout";
   private static final String CONF_HTTP_QUEUESIZE = "http.queuesize";
-
+  private static final String CONF_HTTP_GZIP = "http.gzip";
+  private static final String CONF_HTTP_LCHEADERS = "http.lcheaders";
 
   /**
    * Default scanning period in ms
@@ -114,6 +118,13 @@ public class HTTPWarp10Plugin extends AbstractWarp10Plugin implements Runnable {
    */
   private Map<String, Integer> sizes = new HashMap<String, Integer>();
 
+  private boolean gzip = true;
+  
+  /**
+   * Should we convert header names to lower case in the request map
+   */
+  private boolean lcheaders = false;
+  
   public HTTPWarp10Plugin() {
     super();
   }
@@ -135,7 +146,18 @@ public class HTTPWarp10Plugin extends AbstractWarp10Plugin implements Runnable {
 
     server.addConnector(connector);
 
-    server.setHandler(new WarpScriptHandler(this));
+    WarpScriptHandler handler = new WarpScriptHandler(this);
+
+    if (this.gzip) {
+      GzipHandler gzip = new GzipHandler();
+      gzip.setHandler(handler);
+      gzip.setMinGzipSize(0);
+      gzip.addIncludedMethods("GET","POST");
+      server.setHandler(gzip);
+    } else {
+      server.setHandler(handler);
+    }
+
 
     try {
       server.start();
@@ -306,6 +328,9 @@ public class HTTPWarp10Plugin extends AbstractWarp10Plugin implements Runnable {
       queue = new BlockingArrayQueue<>(Integer.parseInt(properties.getProperty(CONF_HTTP_QUEUESIZE)));
     }
 
+    gzip = !"false".equals(properties.get(CONF_HTTP_GZIP));    
+    lcheaders = "true".equals(properties.get(CONF_HTTP_LCHEADERS));
+    
     Thread t = new Thread(this);
     t.setDaemon(true);
     t.setName("[Warp 10 HTTP Plugin " + this.dir + "]");
@@ -340,6 +365,10 @@ public class HTTPWarp10Plugin extends AbstractWarp10Plugin implements Runnable {
 
   public boolean isParsePayload(String uri) {
     return this.parsePayloads.get(uri);
+  }
+  
+  public boolean isLcHeaders() {
+    return this.lcheaders;
   }
 
 }
