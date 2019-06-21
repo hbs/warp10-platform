@@ -369,6 +369,10 @@ warpscript.call.directory = ${standalone.home}/calls
 #warpscript.extension.rexec = io.warp10.script.ext.rexec.RexecWarpScriptExtension
 // Comma separated list of included and excluded (! prefixed) host patterns
 #warpscript.rexec.endpoint.patterns = .*
+// REXEC connect timeout in ms (default = 0, no timeout)
+#warpscript.rexec.timeout.connect = 0
+// REXEC read timeout in ms (default = 0, no timeout)
+#warpscript.rexec.timeout.read = 0
 // SENSISIONEVENT, SENSISIONGET, SENSISIONSET, SENSISIONUPDATE
 #warpscript.extension.sensision = io.warp10.script.ext.sensision.SensisionWarpScriptExtension
 // MUTEX, SHMLOAD, SHMSTORE
@@ -973,6 +977,8 @@ runner.minperiod = 1000
 #http.queuesize = 8
 // Set to false to disable support for gzipped responses
 #http.gzip = false
+// Set to true to convert header names to lower case in the request map
+#http.lcheaders = true
 
 //
 // UDP Plugin
