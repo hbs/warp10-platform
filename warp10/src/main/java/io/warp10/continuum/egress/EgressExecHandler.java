@@ -60,11 +60,14 @@ import io.warp10.script.StackUtils;
 import io.warp10.script.WarpScriptException;
 import io.warp10.script.WarpScriptLib;
 import io.warp10.script.WarpScriptStack;
+import io.warp10.script.WarpScriptStack.Signal;
 import io.warp10.script.WarpScriptStack.StackContext;
 import io.warp10.script.WarpScriptStackRegistry;
 import io.warp10.script.WarpScriptStopException;
 import io.warp10.script.ext.stackps.StackPSWarpScriptExtension;
 import io.warp10.script.functions.AUTHENTICATE;
+import io.warp10.script.functions.DURATION;
+import io.warp10.script.functions.TIMEBOX;
 import io.warp10.sensision.Sensision;
 import io.warp10.warp.sdk.Capabilities;
 
@@ -82,7 +85,13 @@ public class EgressExecHandler extends AbstractHandler {
 
   private final BootstrapManager bootstrapManager;
 
+  // Our version of TIMEBOX will signal the stack with a KILL signal to ensure its
+  // execution is aborted even within a FETCH or FIND.
+  private static final TIMEBOX TIMEBOX = new TIMEBOX(WarpScriptLib.TIMEBOX, Signal.KILL);
+  private static final DURATION DURATION = new DURATION(WarpScriptLib.DURATION);
+
   public EgressExecHandler(KeyStore keyStore, Properties properties, DirectoryClient directoryClient, StoreClient storeClient) {
+
     this.keyStore = keyStore;
     this.storeClient = storeClient;
     this.directoryClient = directoryClient;
@@ -285,6 +294,18 @@ public class EgressExecHandler extends AbstractHandler {
 
       boolean terminate = false;
 
+      String timebox = req.getHeader(Constants.HTTP_HEADER_TIMEBOX);
+
+      boolean forcedMacro = null != timebox;
+
+      if (forcedMacro) {
+        stack.macroOpen();
+      }
+
+      if (null != req.getHeader(Constants.HTTP_HEADER_LINES)) {
+        stack.setAttribute(WarpScriptStack.ATTRIBUTE_LINENO, true);
+      }
+
       while(!terminate) {
         String line = br.readLine();
 
@@ -321,11 +342,27 @@ public class EgressExecHandler extends AbstractHandler {
         times.add(end - nano);
       }
 
+      if (forcedMacro) {
+        stack.macroClose();
+      }
+
       //
       // Make sure stack is balanced
       //
 
       stack.checkBalanced();
+
+      if (null != timebox) {
+        try {
+          long l = Long.parseLong(timebox);
+          stack.push(l);
+        } catch (NumberFormatException nfe) {
+          stack.push(timebox);
+          DURATION.apply(stack);
+        }
+        TIMEBOX.apply(stack);
+        stack.handleSignal();
+      }
 
       //
       // Check the user defined headers and set them.
@@ -460,6 +497,7 @@ public class EgressExecHandler extends AbstractHandler {
         return;
       }
     } finally {
+      stack.signal(Signal.KILL);
       WarpConfig.clearThreadProperties();
       WarpScriptStackRegistry.unregister(stack);
 
