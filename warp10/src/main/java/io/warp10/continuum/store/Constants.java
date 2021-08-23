@@ -123,6 +123,16 @@ public class Constants {
   private static final Map<String,String> HEADERS = new HashMap<String,String>();
 
   /**
+   * Header to set to enable line numbering
+   */
+  public static final String HTTP_HEADER_LINES = "X-Warp10-Lines";
+
+  /**
+   * Header which will force timeboxing of the execution
+   */
+  public static final String HTTP_HEADER_TIMEBOX = "X-Warp10-Timebox";
+
+  /**
    * Header containing a comma separated list of tokens with capabilities
    */
   public static final String HTTP_HEADER_CAPABILITIES_DEFAULT = "X-Warp10-Capabilities";
