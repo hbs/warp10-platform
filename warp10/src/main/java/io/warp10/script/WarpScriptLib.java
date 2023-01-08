@@ -631,6 +631,7 @@ import io.warp10.script.functions.PGPPRIVATE;
 import io.warp10.script.functions.PGPRING;
 import io.warp10.script.functions.PGPENCRYPT;
 import io.warp10.script.functions.PGPDECRYPT;
+import io.warp10.script.functions.PGPGEN;
 import io.warp10.script.functions.PGPSIGN;
 import io.warp10.script.functions.PGPVERIFY;
 import io.warp10.script.functions.PICK;
@@ -1256,6 +1257,7 @@ public class WarpScriptLib {
   public static final String PGPINFO = "PGPINFO";
   public static final String PGPENCRYPT = "PGPENCRYPT";
   public static final String PGPDECRYPT = "PGPDECRYPT";
+  public static final String PGPGEN = "PGPGEN";
   public static final String PGPSIGN = "PGPSIGN";
   public static final String PGPVERIFY = "PGPVERIFY";
   public static final String URLDECODE = "URLDECODE";
@@ -1672,7 +1674,7 @@ public class WarpScriptLib {
   public static final String ASREGS = "ASREGS";
   public static final String ASENCODERS = "ASENCODERS";
   public static final String SLEEP = "SLEEP";
-  
+
   public static final String TOLIST = "->LIST";
   public static final String TOMAP = "->MAP";
   public static final String TOJSON = "->JSON";
@@ -2179,6 +2181,7 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new PGPPRIVATE(PGPPRIVATE));
     addNamedWarpScriptFunction(new PGPENCRYPT(PGPENCRYPT));
     addNamedWarpScriptFunction(new PGPDECRYPT(PGPDECRYPT));
+    addNamedWarpScriptFunction(new PGPGEN(PGPGEN));
     addNamedWarpScriptFunction(new PGPSIGN(PGPSIGN));
     addNamedWarpScriptFunction(new PGPVERIFY(PGPVERIFY));
 
