@@ -40,6 +40,7 @@ import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.cryptlib.CryptlibObjectIdentifiers;
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 import org.bouncycastle.asn1.gnu.GNUObjectIdentifiers;
+import org.bouncycastle.asn1.nist.NISTNamedCurves;
 import org.bouncycastle.asn1.x9.ECNamedCurveTable;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.BCPGKey;
@@ -59,8 +60,15 @@ import org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags;
 import org.bouncycastle.bcpg.sig.Features;
 import org.bouncycastle.bcpg.sig.KeyFlags;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
+import org.bouncycastle.crypto.KeyGenerationParameters;
+import org.bouncycastle.crypto.generators.ECKeyPairGenerator;
 import org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator;
 import org.bouncycastle.crypto.generators.RSAKeyPairGenerator;
+import org.bouncycastle.crypto.params.ECDomainParameters;
+import org.bouncycastle.crypto.params.ECKeyGenerationParameters;
+import org.bouncycastle.crypto.params.ECNamedDomainParameters;
+import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
+import org.bouncycastle.crypto.params.ECPublicKeyParameters;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import org.bouncycastle.crypto.params.RSAKeyGenerationParameters;
@@ -71,6 +79,7 @@ import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.math.ec.FixedPointCombMultiplier;
 import org.bouncycastle.math.ec.FixedPointUtil;
+import org.bouncycastle.math.ec.WNafUtil;
 import org.bouncycastle.math.ec.rfc8032.Ed25519;
 import org.bouncycastle.openpgp.PGPEncryptedData;
 import org.bouncycastle.openpgp.PGPException;
@@ -91,8 +100,10 @@ import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator;
 import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyEncryptorBuilder;
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder;
 import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider;
+import org.bouncycastle.openpgp.operator.bc.BcPGPKeyConverter;
 import org.bouncycastle.openpgp.operator.bc.BcPGPKeyPair;
-
+import org.bouncycastle.util.BigIntegers;
+import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.openpgp.PGPPrivateKey;
 
 import io.warp10.continuum.store.Constants;
@@ -108,11 +119,7 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
   private static final String PARAM_ID = "id";
   private static final String PARAM_PASSPHRASE = "passphrase";
   private static final String PARAM_DATE = "date";
-  private static final String PARAM_SIGNATURE = "signature";
-  private static final String PARAM_ENCRYPTION = "encryption";
-  private static final String PARAM_SIZE = "size";
-  private static final String PARAM_PUBLIC = "public";
-  private static final String PARAM_PRIVATE = "private";
+  private static final String PARAM_NAFWEIGHTCHECK = "nafweightcheck";
 
   public PGPGEN(String name) {
     super(name);
@@ -138,7 +145,6 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
     }
 
     int s2kcount = 0x60;
-    long exponent = 0x10001L;
 
     String id = String.valueOf(params.getOrDefault(PARAM_ID,UUID.randomUUID().toString()));
 
@@ -149,104 +155,110 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
 
       String curve = (String) (params.get(PARAM_CURVE) instanceof String ? params.get(PARAM_CURVE) : null);
 
-      if (!(curve instanceof String && "P-256".equals(curve) || "P-384".equals(curve) || "P-521".equals(curve) || "curve25519".equals(curve))) {
-        throw new WarpScriptException(getName() + " invalid curve, must be one of 'P-256', 'P-384', 'P-521' or 'curve25519'");
-      }
-
-      if (!(params.get(PARAM_D) instanceof String)) {
-        throw new WarpScriptException(getName() + " missing ECC private key '" + PARAM_D + "'.");
-      }
-
-      String dstr = (String) params.get(PARAM_D);
-
+      boolean nafWeightCheck = Boolean.TRUE.equals(params.get(PARAM_NAFWEIGHTCHECK));
       BigInteger d = null;
+      byte[] dbytes = null;
 
-      if (dstr.startsWith("0x")) {
-        d = new BigInteger(dstr.substring(2), 16);
-      } else {
-        d = new BigInteger(dstr);
+      if (params.get(PARAM_D) instanceof String) {
+        String dstr = (String) params.get(PARAM_D);
+
+        if (dstr.startsWith("0x")) {
+          d = new BigInteger(dstr.substring(2), 16);
+        } else {
+          d = new BigInteger(dstr);
+        }
+        dbytes = d.toByteArray();
+      }
+
+      SecureRandom random = new SecureRandom();
+
+      BcPGPKeyPair masterkp = null;
+      BcPGPKeyPair enckp = null;
+
+      Date date = new Date(0L);
+
+      if (params.get(PARAM_DATE) instanceof Long) {
+        date = new Date(((Long) params.get(PARAM_DATE)).longValue() / Constants.TIME_UNITS_PER_MS);
       }
 
       ECNamedCurveParameterSpec spec = org.bouncycastle.jce.ECNamedCurveTable.getParameterSpec(curve);
+      ECKeyPairGenerator eckpg = new ECKeyPairGenerator();
+      ECNamedDomainParameters domainParams = new ECNamedDomainParameters(ECNamedCurveTable.getOID(spec.getName()), spec.getCurve(), spec.getG(), spec.getN(), spec.getH());
+      ECKeyGenerationParameters eckgp = new ECKeyGenerationParameters(domainParams, random);
+      eckpg.init(eckgp);
 
-      if (null == spec) {
-        throw new WarpScriptException(getName() + " unknown curve.");
-      }
+      if ("curve25519".equals(curve)) {
+        Ed25519KeyPairGenerator edkpg = new Ed25519KeyPairGenerator();
+        edkpg.init(new KeyGenerationParameters(random, 0));
 
-      ECPoint q = null;
+        AsymmetricCipherKeyPair ackp = null;
 
-      ECCurve c = spec.getG().getCurve();
-      int size = FixedPointUtil.getCombSize(c);
-
-      if (d.bitLength() > size) {
-        q = spec.getG().multiply(d);
+        if (null != d) {
+          byte[] buf = new byte[Ed25519PrivateKeyParameters.KEY_SIZE];
+          if (dbytes.length > buf.length) {
+            throw new WarpScriptException(getName() + " private key exceeds selected curve key size (" + buf.length + " bytes).");
+          }
+          System.arraycopy(dbytes, 0, buf, buf.length - dbytes.length, dbytes.length);
+          Ed25519PrivateKeyParameters privateKey = new Ed25519PrivateKeyParameters(buf);
+          Ed25519PublicKeyParameters publicKey = privateKey.generatePublicKey();
+          ackp = new AsymmetricCipherKeyPair(publicKey, privateKey);
+        } else {
+          ackp = edkpg.generateKeyPair();
+        }
+        masterkp = new BcPGPKeyPair(PublicKeyAlgorithmTags.EDDSA, ackp, date);
       } else {
-        q = new FixedPointCombMultiplier().multiply(spec.getG(), d);
+        AsymmetricCipherKeyPair ackp = null;
+
+        if (null != d) {
+          BigInteger n = eckgp.getDomainParameters().getN();
+          int nBitLength = n.bitLength();
+          int minWeight = nBitLength >>> 2;
+
+          if (d.compareTo(BigInteger.ONE) < 0  || (d.compareTo(n) >= 0)) {
+            throw new WarpScriptException(getName() + " private key should be positive and less than curve order (" + n + ").");
+          }
+
+          // (non-zero entries in signed-binary, non-adjacent form (NAF) representation)
+          if (nafWeightCheck && WNafUtil.getNafWeight(d) < minWeight) {
+            throw new WarpScriptException(getName() + " private key has a low NAF weight ( < " + minWeight + ").");
+          }
+
+          ECPoint Q = new FixedPointCombMultiplier().multiply(eckgp.getDomainParameters().getG(), d);
+
+          ackp = new AsymmetricCipherKeyPair(new ECPublicKeyParameters(Q, eckgp.getDomainParameters()), new ECPrivateKeyParameters(d, eckgp.getDomainParameters()));
+        } else {
+          ackp = eckpg.generateKeyPair();
+        }
+        masterkp = new BcPGPKeyPair(PublicKeyAlgorithmTags.ECDSA, ackp, date);
       }
 
-      BCPGKey eccpriv_sign;
-      BCPGKey eccpriv_enc;
-      BCPGKey eccpub_enc;
-      BCPGKey eccpub_sign;
-      PublicKeyPacket pkp_sign;
-      PublicKeyPacket pkp_enc;
+      eckpg.init(eckgp);
+      AsymmetricCipherKeyPair ackp = null;
 
-      if (!(params.getOrDefault(PARAM_DATE, 0L) instanceof Long)) {
-        throw new WarpScriptException(getName() + " invalid date, expected a LONG.");
-      }
+      if (null != d) {
+        BigInteger n = eckgp.getDomainParameters().getN();
+        int nBitLength = n.bitLength();
+        int minWeight = nBitLength >>> 2;
 
-      Date date = new Date(((Long) params.getOrDefault(PARAM_DATE, System.currentTimeMillis() * Constants.TIME_UNITS_PER_MS)).longValue() / Constants.TIME_UNITS_PER_MS);
-
-      if (CryptlibObjectIdentifiers.curvey25519 == ECNamedCurveTable.getOID(curve)) {
-        eccpriv_sign = new EdSecretBCPGKey(d);
-
-        byte[] bi = d.toByteArray();
-        if (bi.length > Ed25519.SECRET_KEY_SIZE) {
-          throw new WarpScriptException(getName() + " invalid private key size for curve Ed25519, expected " + Ed25519.SECRET_KEY_SIZE + " bytes, was " + bi.length + ".");
-        } else if (bi.length < Ed25519.SECRET_KEY_SIZE) {
-          byte[] tmp = bi;
-          bi = new byte[Ed25519.SECRET_KEY_SIZE];
-          System.arraycopy(tmp, 0, bi, bi.length - tmp.length, tmp.length);
+        if (d.compareTo(BigInteger.ONE) < 0  || (d.compareTo(n) >= 0)) {
+          throw new WarpScriptException(getName() + " private key should be positive and less than curve order (" + n + ").");
         }
 
-        Ed25519PrivateKeyParameters edpkp = new Ed25519PrivateKeyParameters(bi);
-        Ed25519PublicKeyParameters edpubkp = edpkp.generatePublicKey();
-        byte[] pointEnc = new byte[1 + Ed25519PublicKeyParameters.KEY_SIZE];
-        pointEnc[0] = 0x40;
-        edpubkp.encode(pointEnc, 1);
-        eccpub_sign = new EdDSAPublicBCPGKey(GNUObjectIdentifiers.Ed25519, new BigInteger(1, pointEnc));
-        pkp_sign = new PublicKeyPacket(PublicKeyAlgorithmTags.EDDSA, date, eccpub_sign);
+        if (nafWeightCheck && WNafUtil.getNafWeight(d) < minWeight) {
+          throw new WarpScriptException(getName() + " private key has a low NAF weight ( < " + minWeight + ").");
+        }
+
+        ECPoint Q = new FixedPointCombMultiplier().multiply(eckgp.getDomainParameters().getG(), d);
+
+        ackp = new AsymmetricCipherKeyPair(new ECPublicKeyParameters(Q, eckgp.getDomainParameters()), new ECPrivateKeyParameters(d, eckgp.getDomainParameters()));
       } else {
-        eccpriv_sign = new ECSecretBCPGKey(d);
-        eccpub_sign = new ECDSAPublicBCPGKey(ECNamedCurveTable.getOID(curve), q);
-        pkp_sign = new PublicKeyPacket(PublicKeyAlgorithmTags.ECDSA, date, eccpub_sign);
+        ackp = eckpg.generateKeyPair();
       }
 
-      eccpriv_enc = new ECSecretBCPGKey(d);
-      eccpub_enc = new ECDHPublicBCPGKey(ECNamedCurveTable.getOID(curve), q, HashAlgorithmTags.SHA512, SymmetricKeyAlgorithmTags.AES_256);
-      pkp_enc = new PublicKeyPacket(PublicKeyAlgorithmTags.ECDH, date, eccpub_enc);
+      enckp = new BcPGPKeyPair(PublicKeyAlgorithmTags.ECDH, ackp, date);
 
-      PGPPublicKey pub_sign = new PGPPublicKey(pkp_sign, new BcKeyFingerprintCalculator());
-      PGPPublicKey pub_enc = new PGPPublicKey(pkp_enc, new BcKeyFingerprintCalculator());
-      PGPPrivateKey priv_sign = new PGPPrivateKey(pub_sign.getKeyID(), pkp_sign, eccpriv_sign);
-      PGPPrivateKey priv_enc = new PGPPrivateKey(pub_enc.getKeyID(), pkp_enc, eccpriv_enc);
-
-      //
-      // The signing and encryption keys are identical to avoid creating a new random key and
-      // to also avoir having to cross-certify the keys.
-      //
-
-      PGPKeyPair kp_sign = new PGPKeyPair(pub_sign, priv_sign);
-      PGPKeyPair kp_enc = new PGPKeyPair(pub_enc, priv_enc);
-
-//      //#################################
-//      RSAKeyPairGenerator  kpg = new RSAKeyPairGenerator();
-//      kpg.init(new RSAKeyGenerationParameters(BigInteger.valueOf(exponent), new SecureRandom(), keysize, certainty));
-//      // First create the master (signing) key with the generator.
-//      PGPKeyPair rsakp_sign = new BcPGPKeyPair(PGPPublicKey.RSA_SIGN, kpg.generateKeyPair(), new Date());
-////      // Then an encryption subkey.
-////      PGPKeyPair rsakp_enc = new BcPGPKeyPair(PGPPublicKey.RSA_ENCRYPT, kpg.generateKeyPair(), new Date());
-
+      System.out.println("ENC KP PUB ENCODED=" + Hex.toHexString(((PGPPublicKey) enckp.getPublicKey()).getEncoded()));
+      System.out.println("ENC KP PUB KEYID  =" + ((PGPPublicKey) enckp.getPublicKey()).getKeyID());
 
       // Add a self-signature on the id
       PGPSignatureSubpacketGenerator signhashgen = new PGPSignatureSubpacketGenerator();
@@ -282,7 +294,8 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
       PBESecretKeyEncryptor pske = (new BcPBESecretKeyEncryptorBuilder(PGPEncryptedData.AES_256, sha512Calc, s2kcount)).build(passphrase.toCharArray());
 
       // Finally, create the keyring itself. The constructor takes parameters that allow it to generate the self signature.
-      PGPKeyRingGenerator keyRingGen = new PGPKeyRingGenerator(PGPSignature.POSITIVE_CERTIFICATION, kp_sign, id, sha1Calc, signhashgen.generate(), null, new BcPGPContentSignerBuilder(kp_sign.getPublicKey().getAlgorithm(), HashAlgorithmTags.SHA512), pske);
+      PGPKeyRingGenerator keyRingGen = new PGPKeyRingGenerator(PGPSignature.POSITIVE_CERTIFICATION, masterkp, id, sha1Calc, signhashgen.generate(), null, new BcPGPContentSignerBuilder(masterkp.getPublicKey().getAlgorithm(), HashAlgorithmTags.SHA512), pske);
+
 
       // Create a signature on the encryption subkey.
       PGPSignatureSubpacketGenerator enchashgen = new PGPSignatureSubpacketGenerator();
@@ -342,7 +355,7 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
 
       enchashgen.addSignerUserID(false, id);
 
-      keyRingGen.addSubKey(kp_enc, enchashgen.generate(), null);
+      keyRingGen.addSubKey(enckp, enchashgen.generate(), null);
 
       PGPSecretKeyRing skr =  keyRingGen.generateSecretKeyRing();
       ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -353,7 +366,8 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
       stack.push(new String(data, 0, data.length, StandardCharsets.US_ASCII));
 
       return stack;
-    } catch (PGPException|IOException e) {
+    } catch (Throwable e) { // PGPException|IOException
+      e.printStackTrace();
       throw new WarpScriptException(getName() + " error while generating PGP key ring.",e);
     }
   }
