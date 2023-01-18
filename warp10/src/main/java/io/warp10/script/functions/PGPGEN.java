@@ -42,6 +42,7 @@ import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 import org.bouncycastle.asn1.gnu.GNUObjectIdentifiers;
 import org.bouncycastle.asn1.nist.NISTNamedCurves;
 import org.bouncycastle.asn1.x9.ECNamedCurveTable;
+import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.BCPGKey;
 import org.bouncycastle.bcpg.CompressionAlgorithmTags;
@@ -61,6 +62,7 @@ import org.bouncycastle.bcpg.sig.Features;
 import org.bouncycastle.bcpg.sig.KeyFlags;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.crypto.KeyGenerationParameters;
+import org.bouncycastle.crypto.ec.CustomNamedCurves;
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator;
 import org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator;
 import org.bouncycastle.crypto.generators.RSAKeyPairGenerator;
@@ -182,15 +184,15 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
       }
 
       ECNamedCurveParameterSpec spec = org.bouncycastle.jce.ECNamedCurveTable.getParameterSpec(curve);
-      ECKeyPairGenerator eckpg = new ECKeyPairGenerator();
-      ECNamedDomainParameters domainParams = new ECNamedDomainParameters(ECNamedCurveTable.getOID(spec.getName()), spec.getCurve(), spec.getG(), spec.getN(), spec.getH());
+      //X9ECParameters spec = CustomNamedCurves.getByName(curve);
+      ASN1ObjectIdentifier curveoid = ECNamedCurveTable.getOID(spec.getName());
+      ECNamedDomainParameters domainParams = new ECNamedDomainParameters(curveoid, spec.getCurve(), spec.getG(), spec.getN(), spec.getH());
       ECKeyGenerationParameters eckgp = new ECKeyGenerationParameters(domainParams, random);
+
+      ECKeyPairGenerator eckpg = new ECKeyPairGenerator();
       eckpg.init(eckgp);
 
-      if ("curve25519".equals(curve)) {
-        Ed25519KeyPairGenerator edkpg = new Ed25519KeyPairGenerator();
-        edkpg.init(new KeyGenerationParameters(random, 0));
-
+      if (CryptlibObjectIdentifiers.curvey25519.equals(curveoid)) { // "curve25519".equals(curve)) {
         AsymmetricCipherKeyPair ackp = null;
 
         if (null != d) {
@@ -203,6 +205,8 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
           Ed25519PublicKeyParameters publicKey = privateKey.generatePublicKey();
           ackp = new AsymmetricCipherKeyPair(publicKey, privateKey);
         } else {
+          Ed25519KeyPairGenerator edkpg = new Ed25519KeyPairGenerator();
+          edkpg.init(new KeyGenerationParameters(random, 0));
           ackp = edkpg.generateKeyPair();
         }
         masterkp = new BcPGPKeyPair(PublicKeyAlgorithmTags.EDDSA, ackp, date);
@@ -224,7 +228,6 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
           }
 
           ECPoint Q = new FixedPointCombMultiplier().multiply(eckgp.getDomainParameters().getG(), d);
-
           ackp = new AsymmetricCipherKeyPair(new ECPublicKeyParameters(Q, eckgp.getDomainParameters()), new ECPrivateKeyParameters(d, eckgp.getDomainParameters()));
         } else {
           ackp = eckpg.generateKeyPair();
@@ -256,7 +259,7 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
       }
 
       enckp = new BcPGPKeyPair(PublicKeyAlgorithmTags.ECDH, ackp, date);
-
+System.out.println("ENC KP PUB FORMAT=" + ((PGPPublicKey) enckp.getPublicKey()).getPublicKeyPacket().getKey().getFormat());
       System.out.println("ENC KP PUB ENCODED=" + Hex.toHexString(((PGPPublicKey) enckp.getPublicKey()).getEncoded()));
       System.out.println("ENC KP PUB KEYID  =" + ((PGPPublicKey) enckp.getPublicKey()).getKeyID());
 
@@ -275,11 +278,11 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
       });
 
       signhashgen.setPreferredHashAlgorithms(false, new int[] {
-        HashAlgorithmTags.SHA256,
-        HashAlgorithmTags.SHA1,
-        HashAlgorithmTags.SHA384,
         HashAlgorithmTags.SHA512,
+        HashAlgorithmTags.SHA384,
+        HashAlgorithmTags.SHA256,
         HashAlgorithmTags.SHA224,
+        HashAlgorithmTags.SHA1,
       });
 
       // 3) Request senders add additional checksums to the message (useful when verifying unsigned messages.)
