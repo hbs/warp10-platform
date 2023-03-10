@@ -201,6 +201,20 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
             throw new WarpScriptException(getName() + " private key exceeds selected curve key size (" + buf.length + " bytes).");
           }
           System.arraycopy(dbytes, 0, buf, buf.length - dbytes.length, dbytes.length);
+
+          //
+          // Check that lower 3 bits are 0 (private key must be a multiple of 8 as 8 is the cofactor to avoid leakage in case of small subgroup attacks)
+          // Check that bit 255 is 0 and bit 254 is 1 which are there to protect against timing attacks.
+          //
+
+          if ((0xC0 & (int) buf[0]) != 0x40) {
+            throw new WarpScriptException(getName() + " invalid key, bit 255 must be cleared and bit 254 set.");
+          }
+
+          if ((0x07 & (int) buf[buf.length - 1]) != 0) {
+            throw new WarpScriptException(getName() + " invalid key, lower 3 bits must be cleared.");
+          }
+
           Ed25519PrivateKeyParameters privateKey = new Ed25519PrivateKeyParameters(buf);
           Ed25519PublicKeyParameters publicKey = privateKey.generatePublicKey();
           ackp = new AsymmetricCipherKeyPair(publicKey, privateKey);
