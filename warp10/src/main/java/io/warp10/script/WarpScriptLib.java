@@ -25,10 +25,24 @@ import io.warp10.continuum.gts.CORRELATE;
 import io.warp10.continuum.gts.DISCORDS;
 import io.warp10.continuum.gts.FFT;
 import io.warp10.continuum.gts.GeoTimeSerie.TYPE;
+import io.warp10.fdb.FDBGET;
+import io.warp10.fdb.FDBSIZE;
+import io.warp10.fdb.FDBSTATUS;
+import io.warp10.fdb.FDBTENANT;
 import io.warp10.continuum.gts.IFFT;
 import io.warp10.continuum.gts.INTERPOLATE;
 import io.warp10.continuum.gts.LOCATIONOFFSET;
 import io.warp10.continuum.gts.ZIP;
+import io.warp10.leveldb.LEVELDBOPEN;
+import io.warp10.leveldb.LEVELDBCLOSE;
+import io.warp10.leveldb.LEVELDBCOMPACT;
+import io.warp10.leveldb.LEVELDBREPAIR;
+import io.warp10.leveldb.LEVELDBSNAPSHOT;
+import io.warp10.leveldb.SSTFIND;
+import io.warp10.leveldb.SSTINFO;
+import io.warp10.leveldb.SSTPURGE;
+import io.warp10.leveldb.SSTREPORT;
+import io.warp10.leveldb.SSTTIMESTAMP;
 import io.warp10.script.aggregator.And;
 import io.warp10.script.aggregator.Argminmax;
 import io.warp10.script.aggregator.CircularMean;
@@ -94,6 +108,8 @@ import io.warp10.script.filter.FilterLastLE;
 import io.warp10.script.filter.FilterLastLT;
 import io.warp10.script.filter.FilterLastNE;
 import io.warp10.script.filter.LatencyFilter;
+import io.warp10.script.functions.WSAUDIT;
+import io.warp10.script.functions.WSAUDITMODE;
 import io.warp10.script.functions.math.GETEXPONENT;
 import io.warp10.script.functions.math.RANDOM;
 import io.warp10.script.functions.math.ROUND;
@@ -118,7 +134,10 @@ import io.warp10.script.mapper.MapperFinite;
 import io.warp10.script.mapper.MapperFloor;
 import io.warp10.script.mapper.MapperGeoApproximate;
 import io.warp10.script.mapper.MapperGeoClearPosition;
+import io.warp10.script.mapper.MapperGeoElevation;
 import io.warp10.script.mapper.MapperGeoFence;
+import io.warp10.script.mapper.MapperGeoLatitude;
+import io.warp10.script.mapper.MapperGeoLongitude;
 import io.warp10.script.mapper.MapperGeoOutside;
 import io.warp10.script.mapper.MapperGeoWithin;
 import io.warp10.script.mapper.MapperHourOfDay;
@@ -823,7 +842,6 @@ import io.warp10.script.functions.VARINTTO;
 import io.warp10.script.functions.VARS;
 import io.warp10.script.functions.VECTO;
 import io.warp10.script.functions.VECTORTO;
-import io.warp10.script.functions.WEBCALL;
 import io.warp10.script.functions.WFOFF;
 import io.warp10.script.functions.WFON;
 import io.warp10.script.functions.WFADDREPO;
@@ -884,13 +902,17 @@ public class WarpScriptLib {
   public static final String STDERR = "STDERR";
   public static final String LOGMSG = "LOGMSG";
   public static final String TDESCRIBE = "TDESCRIBE";
-
+  public static final String WSAUDIT = "WSAUDIT";
+  public static final String WSAUDITMODE = "WSAUDITMODE";
+  
   public static final String REF = "REF";
   public static final String COMPILE = "COMPILE";
   public static final String SAFECOMPILE = "SAFECOMPILE";
   public static final String COMPILED = "COMPILED";
 
   public static final String EVAL = "EVAL";
+  // e'X'posing EVAL, will never mark macros it produces as secure
+  public static final String XEVAL = "XEVAL";
   public static final String EVALSECURE = "EVALSECURE";
   public static final String MSEC = "MSEC";
   public static final String MRSEC = "MRSEC";
@@ -1404,7 +1426,6 @@ public class WarpScriptLib {
   public static final String METAMATCH = "METAMATCH";
   public static final String METADIFF = "METADIFF";
   public static final String DELETE = "DELETE";
-  public static final String WEBCALL = "WEBCALL";
   public static final String MATCH = "MATCH";
   public static final String MATCHER = "MATCHER";
   public static final String REPLACE = "REPLACE";
@@ -1791,6 +1812,30 @@ public class WarpScriptLib {
 
   public static final String EQ = "==";
 
+  //
+  // LevelDB
+  //
+
+  public static final String LEVELDBCLOSE = "LEVELDBCLOSE";
+  public static final String LEVELDBOPEN = "LEVELDBOPEN";
+  public static final String LEVELDBREPAIR = "LEVELDBREPAIR";
+  public static final String LEVELDBCOMPACT = "LEVELDBCOMPACT";
+  public static final String LEVELDBSNAPSHOT = "LEVELDBSNAPSHOT";
+  public static final String LEVELDBSNAPSHOTINC = "LEVELDBSNAPSHOTINC";
+  public static final String SSTFIND = "SSTFIND";
+  public static final String SSTINFO = "SSTINFO";
+  public static final String SSTPURGE = "SSTPURGE";
+  public static final String SSTREPORT = "SSTREPORT";
+  public static final String SSTTIMESTAMP = "SSTTIMESTAMP";
+
+  //
+  // FDB
+  //
+
+  public static final String FDBTENANT = "FDBTENANT";
+  public static final String FDBSTATUS = "FDBSTATUS";
+  public static final String FDBSIZE = "FDBSIZE";
+  public static final String FDBGET = "FDBGET";
 
   static {
 
@@ -1901,6 +1946,7 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new FUNCTIONS(FUNCTIONS));
     addNamedWarpScriptFunction(new MAXJSON(MAXJSON));
     addNamedWarpScriptFunction(new EVAL(EVAL));
+    addNamedWarpScriptFunction(new EVAL(XEVAL, true));
     addNamedWarpScriptFunction(new FUNCREF(FUNCREF));
     addNamedWarpScriptFunction(new NOW(NOW));
     addNamedWarpScriptFunction(new AGO(AGO));
@@ -2383,7 +2429,6 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new METAMATCH(METAMATCH));
     addNamedWarpScriptFunction(new META(METADIFF, true));
     addNamedWarpScriptFunction(new DELETE(DELETE));
-    addNamedWarpScriptFunction(new WEBCALL(WEBCALL));
     addNamedWarpScriptFunction(new MATCH(MATCH));
     addNamedWarpScriptFunction(new MATCHER(MATCHER));
     addNamedWarpScriptFunction(new REPLACE(REPLACE, false));
@@ -2567,6 +2612,10 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new MapperHourOfDay.Builder("mapper.hour"));
     addNamedWarpScriptFunction(new MapperMinuteOfHour.Builder("mapper.minute"));
     addNamedWarpScriptFunction(new MapperSecondOfMinute.Builder("mapper.second"));
+
+    addNamedWarpScriptFunction(new MapperGeoLatitude("mapper.lat"));
+    addNamedWarpScriptFunction(new MapperGeoLongitude("mapper.lon"));
+    addNamedWarpScriptFunction(new MapperGeoElevation("mapper.elev"));
 
     addNamedWarpScriptFunction(new MapperNPDF.Builder("mapper.npdf"));
     addNamedWarpScriptFunction(new MapperDotProduct.Builder("mapper.dotproduct"));
@@ -3141,7 +3190,33 @@ public class WarpScriptLib {
     addNamedWarpScriptFunction(new LOGINIT(LOGINIT));
     addNamedWarpScriptFunction(new TDESCRIBE(TDESCRIBE));
     addNamedWarpScriptFunction(new SLEEP(SLEEP));
+    addNamedWarpScriptFunction(new WSAUDIT(WSAUDIT));
+    addNamedWarpScriptFunction(new WSAUDITMODE(WSAUDITMODE));
 
+    //
+    // LevelDB
+    //
+
+    addNamedWarpScriptFunction(new LEVELDBOPEN(LEVELDBOPEN));
+    addNamedWarpScriptFunction(new LEVELDBCLOSE(LEVELDBCLOSE));
+    addNamedWarpScriptFunction(new LEVELDBREPAIR(LEVELDBREPAIR));
+    addNamedWarpScriptFunction(new LEVELDBCOMPACT(LEVELDBCOMPACT));
+    addNamedWarpScriptFunction(new LEVELDBSNAPSHOT(LEVELDBSNAPSHOT, false));
+    addNamedWarpScriptFunction(new LEVELDBSNAPSHOT(LEVELDBSNAPSHOTINC, true));
+    addNamedWarpScriptFunction(new SSTFIND(SSTFIND));
+    addNamedWarpScriptFunction(new SSTINFO(SSTINFO));
+    addNamedWarpScriptFunction(new SSTPURGE(SSTPURGE));
+    addNamedWarpScriptFunction(new SSTREPORT(SSTREPORT));
+    addNamedWarpScriptFunction(new SSTTIMESTAMP(SSTTIMESTAMP));
+
+    //
+    // FDB
+    //
+
+    addNamedWarpScriptFunction(new FDBTENANT(FDBTENANT));
+    addNamedWarpScriptFunction(new FDBSTATUS(FDBSTATUS));
+    addNamedWarpScriptFunction(new FDBSIZE(FDBSIZE));
+    addNamedWarpScriptFunction(new FDBGET(FDBGET));
 
     /////////////////////////
 
