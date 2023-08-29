@@ -16,7 +16,21 @@
 
 package io.warp10;
 
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+
+import com.google.common.base.Preconditions;
+
 import io.warp10.continuum.Configuration;
+import io.warp10.continuum.MetadataUtils;
 import io.warp10.continuum.ThrottlingManager;
 import io.warp10.continuum.egress.Egress;
 import io.warp10.continuum.ingress.Ingress;
@@ -35,18 +49,6 @@ import io.warp10.script.ScriptRunner;
 import io.warp10.script.WarpScriptLib;
 import io.warp10.sensision.Sensision;
 import io.warp10.warp.sdk.AbstractWarp10Plugin;
-
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.Map.Entry;
-
-import com.google.common.base.Preconditions;
 
 /**
  * Main class for launching components of the Continuum geo time series storage system
@@ -85,6 +87,8 @@ public class WarpDist {
    * Do we run an 'egress' service. Used in WarpScript MacroRepository to bail out if not
    */
   private static boolean hasEgress = false;
+
+  private static AtomicReference<Throwable> abort = new AtomicReference<Throwable>(null);
 
   public static void setProperties(Properties props) {
     if (null != properties) {
@@ -125,23 +129,25 @@ public class WarpDist {
 
   public static void main(String[] args) throws Exception {
 
-    System.out.println();
-    System.out.println(Constants.WARP10_BANNER);
-    System.out.println("  Revision " + Revision.REVISION);
-    System.out.println();
+    if (null == properties) {
+      System.out.println();
+      System.out.println(Constants.WARP10_BANNER);
+      System.out.println("  Revision " + Revision.REVISION);
+      System.out.println();
 
-    System.setProperty("java.awt.headless", "true");
+      System.setProperty("java.awt.headless", "true");
 
-    if (StandardCharsets.UTF_8 != Charset.defaultCharset()) {
-      throw new RuntimeException("Default encoding MUST be UTF-8 but it is " + Charset.defaultCharset() + ". Aborting.");
-    }
+      if (StandardCharsets.UTF_8 != Charset.defaultCharset()) {
+        throw new RuntimeException("Default encoding MUST be UTF-8 but it is " + Charset.defaultCharset() + ". Aborting.");
+      }
 
-    if (args.length > 0) {
-      setProperties(args);
-    } else if (null != System.getProperty(WarpConfig.WARP10_CONFIG)) {
-      setProperties(System.getProperty(WarpConfig.WARP10_CONFIG).split("[, ]+"));
-    } else if (null != System.getenv(WarpConfig.WARP10_CONFIG_ENV)) {
-      setProperties(System.getenv(WarpConfig.WARP10_CONFIG_ENV).split("[, ]+"));
+      if (args.length > 0) {
+        setProperties(args);
+      } else if (null != System.getProperty(WarpConfig.WARP10_CONFIG)) {
+        setProperties(System.getProperty(WarpConfig.WARP10_CONFIG).split("[, ]+"));
+      } else if (null != System.getenv(WarpConfig.WARP10_CONFIG_ENV)) {
+        setProperties(System.getenv(WarpConfig.WARP10_CONFIG_ENV).split("[, ]+"));
+      }
     }
 
     //
@@ -286,22 +292,27 @@ public class WarpDist {
 
     AbstractWarp10Plugin.registerPlugins();
 
-    setInitialized(true);
+    setInitialized();
 
     //
     // We're done, let's sleep endlessly
     //
 
     try {
-      while (true) {
+      while (null == abort.get()) {
         try {
           Thread.sleep(60000L);
         } catch (InterruptedException ie) {
         }
       }
+      throw (Throwable) abort.get();
     } catch (Throwable t) {
       System.err.println(t.getMessage());
     }
+  }
+
+  public static void abort(Throwable t) {
+    abort.set(t);
   }
 
   public static KeyStore getKeyStore() {
@@ -318,8 +329,13 @@ public class WarpDist {
     return (Properties) properties.clone();
   }
 
-  public static synchronized void setInitialized(boolean initialized) {
-    WarpDist.initialized = initialized;
+  public static synchronized void setInitialized() {
+    //
+    // We know Warp 10 is initialized, perform tests which can only happen after initialization
+    //
+
+    MetadataUtils.validateMetadata(null);
+    WarpDist.initialized = true;
   }
 
   public static synchronized boolean isInitialized() {
