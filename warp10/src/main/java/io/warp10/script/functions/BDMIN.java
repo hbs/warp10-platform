@@ -1,5 +1,5 @@
 //
-//   Copyright 2018  SenX S.A.S.
+//   Copyright 2023  SenX S.A.S.
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -14,32 +14,32 @@
 //   limitations under the License.
 //
 
-package io.warp10.script.functions.math;
+package io.warp10.script.functions;
+
+import java.math.BigDecimal;
 
 import io.warp10.script.NamedWarpScriptFunction;
 import io.warp10.script.WarpScriptException;
 import io.warp10.script.WarpScriptStack;
 import io.warp10.script.WarpScriptStackFunction;
 
-/**
- * Check https://docs.oracle.com/javase/8/docs/api/java/lang/Math.html for the documentation of this function.
- * Last java parameter is on top of the stack.
- */
-public class ROUND extends NamedWarpScriptFunction implements WarpScriptStackFunction {
+public class BDMIN extends NamedWarpScriptFunction implements WarpScriptStackFunction {
 
-  public ROUND(String name) {
+  public BDMIN(String name) {
     super(name);
   }
 
   @Override
   public Object apply(WarpScriptStack stack) throws WarpScriptException {
-    Object op0 = stack.pop();
+    Object o = stack.pop();
 
-    if (!(op0 instanceof Number)) {
-      throw new WarpScriptException(getName() + " can only operate on numerical values.");
-    }
+    BigDecimal bd1 = TOBD.toBigDecimal(getName(), o);
 
-    stack.push(Math.round(((Number) op0).doubleValue()));
+    o = stack.pop();
+
+    BigDecimal bd2 = TOBD.toBigDecimal(getName(), o);
+
+    stack.push(bd1.min(bd2));
 
     return stack;
   }
