@@ -200,6 +200,8 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
           if (dbytes.length > buf.length) {
             throw new WarpScriptException(getName() + " private key exceeds selected curve key size (" + buf.length + " bytes).");
           }
+
+          // copy the private key, padding with 0x00 on the left
           System.arraycopy(dbytes, 0, buf, buf.length - dbytes.length, dbytes.length);
 
           //
@@ -223,6 +225,7 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
           edkpg.init(new KeyGenerationParameters(random, 0));
           ackp = edkpg.generateKeyPair();
         }
+
         masterkp = new BcPGPKeyPair(PublicKeyAlgorithmTags.EDDSA, ackp, date);
       } else {
         AsymmetricCipherKeyPair ackp = null;
@@ -246,6 +249,7 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
         } else {
           ackp = eckpg.generateKeyPair();
         }
+
         masterkp = new BcPGPKeyPair(PublicKeyAlgorithmTags.ECDSA, ackp, date);
       }
 
@@ -273,7 +277,7 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
       }
 
       enckp = new BcPGPKeyPair(PublicKeyAlgorithmTags.ECDH, ackp, date);
-System.out.println("ENC KP PUB FORMAT=" + ((PGPPublicKey) enckp.getPublicKey()).getPublicKeyPacket().getKey().getFormat());
+      System.out.println("ENC KP PUB FORMAT=" + ((PGPPublicKey) enckp.getPublicKey()).getPublicKeyPacket().getKey().getFormat());
       System.out.println("ENC KP PUB ENCODED=" + Hex.toHexString(((PGPPublicKey) enckp.getPublicKey()).getEncoded()));
       System.out.println("ENC KP PUB KEYID  =" + ((PGPPublicKey) enckp.getPublicKey()).getKeyID());
 
