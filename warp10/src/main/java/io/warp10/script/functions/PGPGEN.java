@@ -209,9 +209,9 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
           // Check that bit 255 is 0 and bit 254 is 1 which are there to protect against timing attacks.
           //
 
-          if ((0xC0 & (int) buf[0]) != 0x40) {
-            throw new WarpScriptException(getName() + " invalid key, bit 255 must be cleared and bit 254 set.");
-          }
+          //if ((0xC0 & (int) buf[0]) != 0x40) {
+          //  throw new WarpScriptException(getName() + " invalid key, bit 255 must be cleared and bit 254 set.");
+          //}
 
           if ((0x07 & (int) buf[buf.length - 1]) != 0) {
             throw new WarpScriptException(getName() + " invalid key, lower 3 bits must be cleared.");
@@ -301,6 +301,13 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
         HashAlgorithmTags.SHA256,
         HashAlgorithmTags.SHA224,
         HashAlgorithmTags.SHA1,
+      });
+
+      signhashgen.setPreferredCompressionAlgorithms(false, new int[] {
+        CompressionAlgorithmTags.BZIP2,
+        CompressionAlgorithmTags.ZLIB,
+        CompressionAlgorithmTags.ZIP,
+        CompressionAlgorithmTags.UNCOMPRESSED
       });
 
       // 3) Request senders add additional checksums to the message (useful when verifying unsigned messages.)
