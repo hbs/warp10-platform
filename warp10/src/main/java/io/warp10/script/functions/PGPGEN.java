@@ -17,6 +17,7 @@
 package io.warp10.script.functions;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -125,6 +126,12 @@ public class PGPGEN extends NamedWarpScriptFunction implements WarpScriptStackFu
           d = new BigInteger(dstr.substring(2), 16);
         } else {
           d = new BigInteger(dstr);
+        }
+      } else if (params.get(PARAM_D) instanceof BigDecimal) {
+        try {
+          d = ((BigDecimal) params.get(PARAM_D)).toBigIntegerExact();
+        } catch (ArithmeticException ae) {
+          throw new WarpScriptException(getName() + " parameter '" + PARAM_D + "' cannot have a fractional part.");
         }
       }
 
