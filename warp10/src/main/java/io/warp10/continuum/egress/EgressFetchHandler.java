@@ -1,5 +1,5 @@
 //
-//   Copyright 2018-2024  SenX S.A.S.
+//   Copyright 2018-2025  SenX S.A.S.
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -867,10 +867,14 @@ public class EgressFetchHandler extends AbstractHandler {
           }
 
           //
-          // Apply token scope
+          // Apply token scope unless retrieving data from splits, in which case the scoping has
+          // been done when generating the splits
           //
 
-          itermeta = FIND.getScopedIterator(itermeta, rtoken.get(), null);
+          if (!splitFetch) {
+            itermeta = FIND.getScopedIterator(itermeta, rtoken.get(), null);
+          }
+
 
           try {
             while(itermeta.hasNext()) {
