@@ -1,5 +1,5 @@
 //
-//   Copyright 2018  SenX S.A.S.
+//   Copyright 2018-2025  SenX S.A.S.
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import io.warp10.script.WarpScriptException;
 import io.warp10.script.WarpScriptStack;
 import io.warp10.script.WarpScriptStackFunction;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,26 +32,48 @@ import org.apache.commons.math3.linear.RealMatrix;
  * Converts a Matrix into nested lists
  */
 public class MATTO extends NamedWarpScriptFunction implements WarpScriptStackFunction {
-  
+
   public MATTO(String name) {
     super(name);
   }
-  
+
   @Override
   public Object apply(WarpScriptStack stack) throws WarpScriptException {
-    
+
     Object o = stack.pop();
-    
+
+    boolean binary = false;
+
+    if (o instanceof Boolean) {
+      binary = Boolean.TRUE.equals(o);
+      o = stack.pop();
+    }
+
     if (!(o instanceof RealMatrix)) {
       throw new WarpScriptException(getName() + " expects a matrix on top of the stack.");
     }
-    
+
     RealMatrix matrix = (RealMatrix) o;
-    
+
+    if (binary) {
+      byte[] data = new byte[matrix.getRowDimension() * matrix.getColumnDimension() * Double.BYTES];
+      ByteBuffer bb = ByteBuffer.wrap(data);
+      bb.order(ByteOrder.BIG_ENDIAN);
+
+      for (int i = 0; i < matrix.getRowDimension(); i++) {
+        for (int j = 0; j < matrix.getColumnDimension(); j++) {
+          bb.putLong(Double.doubleToRawLongBits(matrix.getEntry(i, j)));
+        }
+      }
+
+      stack.push(data);
+      return stack;
+    }
+
     List<Object> rows = new ArrayList<Object>(matrix.getRowDimension());
-    
+
     double[][] data = matrix.getData();
-    
+
     for (int i = 0; i < matrix.getRowDimension(); i++) {
       List<Object> cols = new ArrayList<Object>(matrix.getColumnDimension());
       for (int j = 0; j < matrix.getColumnDimension(); j++) {
@@ -59,7 +83,7 @@ public class MATTO extends NamedWarpScriptFunction implements WarpScriptStackFun
     }
 
     stack.push(rows);
-    
+
     return stack;
   }
 }

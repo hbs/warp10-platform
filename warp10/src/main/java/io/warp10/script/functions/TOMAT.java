@@ -1,5 +1,5 @@
 //
-//   Copyright 2018  SenX S.A.S.
+//   Copyright 2018-2025  SenX S.A.S.
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 
 package io.warp10.script.functions;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 
 import org.apache.commons.math3.linear.MatrixUtils;
@@ -31,34 +33,66 @@ import io.warp10.script.WarpScriptStack;
  * Converts nested lists of numbers into a Matrix
  */
 public class TOMAT extends NamedWarpScriptFunction implements WarpScriptStackFunction {
-  
+
   public TOMAT(String name) {
     super(name);
   }
-  
+
   @Override
   public Object apply(WarpScriptStack stack) throws WarpScriptException {
-    
+
     Object o = stack.pop();
-    
+
     if (o instanceof RealVector) {
-      
+
       RealMatrix matrix = MatrixUtils.createRealMatrix(((RealVector) o).getDimension(), 1);
-      
+
       matrix.setColumnVector(0, (RealVector) o);
-      
+
       stack.push (matrix);
-      
+
       return stack;
     }
-    
+
+    int rows;
+    int cols;
+
+    if (o instanceof Long) {
+      rows = ((Long) o).intValue();
+      o = stack.pop();
+      if (!(o instanceof byte[])) {
+        throw new WarpScriptException(getName() + " expected a serialized matrix as BYTES.");
+      }
+      byte[] data = (byte[]) o;
+
+      if (0 != data.length % Double.BYTES || 0 != (data.length / Double.BYTES) % rows) {
+        throw new WarpScriptException(getName() + " invalid BYTES length.");
+      }
+
+      cols = data.length / Double.BYTES / rows;
+
+      RealMatrix matrix = MatrixUtils.createRealMatrix(rows, cols);
+
+      ByteBuffer bb = ByteBuffer.wrap(data);
+      bb.order(ByteOrder.BIG_ENDIAN);
+
+      for (int row = 0; row < rows; row++) {
+        for (int col = 0; col < cols; col++) {
+          matrix.setEntry(row, col, Double.longBitsToDouble(bb.getLong()));
+        }
+      }
+
+      stack.push(matrix);
+      return stack;
+    }
+
     if (!(o instanceof List)) {
       throw new WarpScriptException(getName() + " expects a 2D array onto the stack.");
     }
-    
-    int rows = ((List) o).size();
-    int cols = -1;
-    
+
+    rows = ((List) o).size();
+    cols = -1;
+
     for (Object oo: (List) o) {
       if (!(oo instanceof List)) {
         throw new WarpScriptException(getName() + " expects a 2D array onto the stack.");
@@ -69,9 +103,9 @@ public class TOMAT extends NamedWarpScriptFunction implements WarpScriptStackFun
         throw new WarpScriptException(getName() + " expects a common number of columns throughout the 2D array.");
       }
     }
-    
+
     double[][] doubles = new double[rows][cols];
-    
+
     for (int i = 0; i < rows; i++) {
       List<Object> row = (List<Object>) ((List) o).get(i);
       for (int j = 0; j < cols; j++) {
@@ -82,9 +116,9 @@ public class TOMAT extends NamedWarpScriptFunction implements WarpScriptStackFun
         doubles[i][j] = ((Number) elt).doubleValue();
       }
     }
-    
+
     RealMatrix mat = MatrixUtils.createRealMatrix(doubles);
-    
+
     stack.push(mat);
 
     return stack;
