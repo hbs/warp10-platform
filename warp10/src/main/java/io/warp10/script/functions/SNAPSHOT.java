@@ -512,10 +512,10 @@ public class SNAPSHOT extends NamedWarpScriptFunction implements WarpScriptStack
         if (readable) {
           sb.append(WarpScriptLib.LIST_START);
           sb.append(System.lineSeparator());
-          for (int i = 0; i < matrix.getColumnDimension(); i++) {
+          for (int i = 0; i < matrix.getRowDimension(); i++) {
             sb.append(WarpScriptLib.LIST_START);
             sb.append(" ");
-            for (int j = 0; j < matrix.getRowDimension(); j++) {
+            for (int j = 0; j < matrix.getColumnDimension(); j++) {
               sb.append(matrix.getEntry(i, j));
               sb.append(" ");
             }
@@ -527,10 +527,10 @@ public class SNAPSHOT extends NamedWarpScriptFunction implements WarpScriptStack
         } else {
           sb.append(WarpScriptLib.EMPTY_LIST);
           sb.append(" ");
-          for (int i = 0; i < matrix.getColumnDimension(); i++) {
+          for (int i = 0; i < matrix.getRowDimension(); i++) {
             sb.append(WarpScriptLib.EMPTY_LIST);
             sb.append(" ");
-            for (int j = 0; j < matrix.getRowDimension(); j++) {
+            for (int j = 0; j < matrix.getColumnDimension(); j++) {
               sb.append(matrix.getEntry(i, j));
               sb.append(" ");
               sb.append(WarpScriptLib.INPLACEADD);
