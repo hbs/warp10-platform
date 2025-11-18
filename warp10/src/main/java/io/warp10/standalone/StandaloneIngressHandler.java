@@ -1,5 +1,5 @@
 //
-//   Copyright 2018-2023  SenX S.A.S.
+//   Copyright 2018-2025  SenX S.A.S.
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -338,6 +338,8 @@ public class StandaloneIngressHandler extends AbstractHandler {
 
       boolean expose = false;
 
+      AtomicLong ignoredCount = null;
+
       try {
         if (null == producer || null == owner) {
           response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid token.");
@@ -562,8 +564,6 @@ public class StandaloneIngressHandler extends AbstractHandler {
 
         boolean lastHadAttributes = false;
 
-        AtomicLong ignoredCount = null;
-
         if ((ignoreOutOfRange && !Boolean.FALSE.equals(ignoor)) || Boolean.TRUE.equals(ignoor)) {
           ignoredCount = new AtomicLong(0L);
         }
@@ -752,6 +752,10 @@ public class StandaloneIngressHandler extends AbstractHandler {
           Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STANDALONE_UPDATE_DATAPOINTS_RAW, sensisionLabels, count + total);
           Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STANDALONE_UPDATE_REQUESTS, sensisionLabels, 1);
           Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STANDALONE_UPDATE_TIME_US, sensisionLabels, (System.nanoTime() - nano) / 1000);
+        }
+
+        if (null != ignoredCount) {
+          Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STANDALONE_UPDATE_OOR_IGNORED, sensisionLabels, ignoredCount.get());
         }
       }
 

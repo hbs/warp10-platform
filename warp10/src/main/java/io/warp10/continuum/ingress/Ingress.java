@@ -1,5 +1,5 @@
 //
-//   Copyright 2018-2024  SenX S.A.S.
+//   Copyright 2018-2025  SenX S.A.S.
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -798,6 +798,8 @@ public class Ingress extends AbstractHandler implements Runnable {
         throw new IOException("Invalid token, missing tenant prefix.");
       }
 
+      AtomicLong ignoredCount = null;
+
       try {
         if (null == producer || null == owner) {
           Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_INGRESS_UPDATE_INVALIDTOKEN, Sensision.EMPTY_LABELS, 1);
@@ -1032,8 +1034,6 @@ public class Ingress extends AbstractHandler implements Runnable {
 
         boolean lastHadAttributes = false;
 
-        AtomicLong ignoredCount = null;
-
         if ((this.ignoreOutOfRange && !Boolean.FALSE.equals(ignoor)) || Boolean.TRUE.equals(ignoor)) {
           ignoredCount = new AtomicLong(0L);
         }
@@ -1227,6 +1227,10 @@ public class Ingress extends AbstractHandler implements Runnable {
 
         Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_INGRESS_UPDATE_TIME_US, sensisionLabels, micros);
         Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_INGRESS_UPDATE_TIME_US_GLOBAL, Sensision.EMPTY_LABELS, micros);
+
+        if (null != ignoredCount) {
+          Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_INGRESS_UPDATE_OOR_IGNORED, sensisionLabels, ignoredCount.get());
+        }
       }
 
       response.setStatus(HttpServletResponse.SC_OK);

@@ -1,5 +1,5 @@
 //
-//   Copyright 2018-2023  SenX S.A.S.
+//   Copyright 2018-2025  SenX S.A.S.
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -222,6 +222,8 @@ public class IngressStreamUpdateHandler extends WebSocketHandler.Simple {
           // Atomic boolean to track if attributes were parsed
           AtomicBoolean hadAttributes = this.handler.ingress.parseAttributes ? new AtomicBoolean(false) : null;
 
+          AtomicLong ignoredCount = null;
+
           try {
             WarpConfig.setThreadProperty(WarpConfig.THREAD_PROPERTY_SESSION, UUID.randomUUID().toString());
 
@@ -231,8 +233,6 @@ public class IngressStreamUpdateHandler extends WebSocketHandler.Simple {
             BufferedReader br = new BufferedReader(new StringReader(message));
 
             boolean lastHadAttributes = false;
-
-            AtomicLong ignoredCount = null;
 
             if ((this.handler.ingress.ignoreOutOfRange && !Boolean.FALSE.equals(this.ignoor)) || Boolean.TRUE.equals(this.ignoor)) {
               ignoredCount = new AtomicLong(0L);
@@ -423,6 +423,10 @@ public class IngressStreamUpdateHandler extends WebSocketHandler.Simple {
             Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STREAM_UPDATE_MESSAGES, sensisionLabels, 1);
             Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STREAM_UPDATE_TIME_US, sensisionLabels, nano / 1000);
             Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STREAM_UPDATE_DATAPOINTS_GLOBAL, Sensision.EMPTY_LABELS, count);
+
+            if (null != ignoredCount) {
+              Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STREAM_UPDATE_OOR_IGNORED, sensisionLabels, ignoredCount.get());
+            }
           }
           session.getRemote().sendString("OK " + (seqno++) + " UPDATE " + count + " " + nano);
         }

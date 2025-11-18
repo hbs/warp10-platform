@@ -406,6 +406,11 @@ public class SensisionConstants {
   public static final String SENSISION_CLASS_CONTINUUM_INGRESS_UPDATE_DATAPOINTS_RAW = "warp.ingress.update.datapoints.raw";
 
   /**
+   * Number of data points ignored because their timestamp was out of the valid range (maxpast/maxfuture)
+   */
+  public static final String SENSISION_CLASS_CONTINUUM_INGRESS_UPDATE_OOR_IGNORED = "warp.ingress.update.oor.ignored";
+
+  /**
    * Number of readings indexed in Continuum
    */
   public static final String SENSISION_CLASS_CONTINUUM_INGRESS_UPDATE_DATAPOINTS_INDEXED = "warp.ingress.update.datapoints.indexed";
@@ -501,6 +506,11 @@ public class SensisionConstants {
   public static final String SENSISION_CLASS_CONTINUUM_STANDALONE_UPDATE_REQUESTS = "warp.standalone.update.requests";
 
   /**
+   * Number of data points ignored because their timestamp was out of the valid range (maxpast/maxfuture)
+   */
+  public static final String SENSISION_CLASS_CONTINUUM_STANDALONE_UPDATE_OOR_IGNORED = "warp.standalone.update.oor.ignored";
+
+  /**
    * Number of 'update' requests received by the standlone streaming version of continuum
    */
   public static final String SENSISION_CLASS_CONTINUUM_STANDALONE_STREAM_UPDATE_REQUESTS = "warp.standalone.update.stream.requests";
@@ -526,9 +536,19 @@ public class SensisionConstants {
   public static final String SENSISION_CLASS_CONTINUUM_STANDALONE_STREAM_UPDATE_MESSAGES = "warp.standalone.update.stream.messages";
 
   /**
+   * Number of data points ignored because their timestamp was out of the valid range (maxpast/maxfuture)
+   */
+  public static final String SENSISION_CLASS_CONTINUUM_STANDALONE_STREAM_UPDATE_OOR_IGNORED = "warp.standalone.update.stream.oor.ignored";
+
+  /**
    * Number of 'update' messages received by the streaming version of continuum
    */
   public static final String SENSISION_CLASS_CONTINUUM_STREAM_UPDATE_MESSAGES = "warp.update.stream.messages";
+
+  /**
+   * Number of data points ignored because their timestamp was out of the valid range (maxfuture/maxpast)
+   */
+  public static final String SENSISION_CLASS_CONTINUUM_STREAM_UPDATE_OOR_IGNORED = "warp.update.stream.oor.ignored";
 
   /**
    * Number of raw readings pushed into Continuum (standalone version)

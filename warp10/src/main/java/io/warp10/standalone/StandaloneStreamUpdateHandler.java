@@ -1,5 +1,5 @@
 //
-//   Copyright 2018-2023  SenX S.A.S.
+//   Copyright 2018-2025  SenX S.A.S.
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -97,9 +97,9 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
   private final boolean ignoreOutOfRange;
 
   private IngressPlugin plugin = null;
-  
+
   private final boolean isFDBStore; // skip FDB tests when not necessary
-  
+
   private final DateTimeFormatter dtf = DateTimeFormat.forPattern("yyyyMMdd'T'HHmmss.SSS").withZoneUTC();
 
   @WebSocket(maxTextMessageSize=1024 * 1024, maxBinaryMessageSize=1024 * 1024)
@@ -439,6 +439,10 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
             Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STANDALONE_STREAM_UPDATE_DATAPOINTS_RAW, sensisionLabels, count);
             Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STANDALONE_STREAM_UPDATE_MESSAGES, sensisionLabels, 1);
             Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STANDALONE_STREAM_UPDATE_TIME_US, sensisionLabels, nano / 1000);
+
+            if (null != ignoredCount) {
+              Sensision.update(SensisionConstants.SENSISION_CLASS_CONTINUUM_STANDALONE_STREAM_UPDATE_OOR_IGNORED, sensisionLabels, ignoredCount.get());
+            }
           }
           if (null != this.handler.plugin) {
             this.handler.plugin.flush(this.handler);
@@ -625,7 +629,7 @@ public class StandaloneStreamUpdateHandler extends WebSocketHandler.Simple {
     }
 
     this.ignoreOutOfRange = "true".equals(WarpConfig.getProperty(Configuration.INGRESS_OUTOFRANGE_IGNORE));
-    
+
     this.isFDBStore = Constants.BACKEND_FDB.equals(WarpConfig.getProperty(Configuration.BACKEND));
   }
 
