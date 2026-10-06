@@ -51,12 +51,16 @@ import io.warp10.quasar.token.thrift.data.WriteToken;
 import io.warp10.script.MemoryWarpScriptStack;
 import io.warp10.script.WarpFleetMacroRepository;
 import io.warp10.script.WarpScriptException;
+import io.warp10.script.WarpScriptStack;
 import io.warp10.script.ext.token.TOKENDUMP;
 import io.warp10.script.ext.token.TOKENGEN;
+import io.warp10.warp.sdk.Capabilities;
 
 public class Tokens {
 
   private static final Logger LOG = LoggerFactory.getLogger(Tokens.class);
+
+  private static final String IN_TOKEN_SCRIPT = ".in.token.script";
 
   private static final Map<String,Object> fileTokens = new HashMap<String,Object>();
 
@@ -172,8 +176,21 @@ public class Tokens {
   private static ReadToken getReadToken(String token) {
 
     if (null != tokenScript) {
+      Object x = WarpConfig.getThreadProperty(IN_TOKEN_SCRIPT);
       try {
+        // Ensure tokenScript is not called recursively
+        if (Boolean.TRUE.equals(WarpConfig.getThreadProperty(IN_TOKEN_SCRIPT))) {
+          LOG.error("Recursive token script call.");
+          return null;
+        }
+
+        WarpConfig.setThreadProperty(IN_TOKEN_SCRIPT, Boolean.TRUE);
+
         MemoryWarpScriptStack stack = new MemoryWarpScriptStack(null,null);
+        // The debug capability is injected to allow the token macro to output log messages
+        Capabilities capabilities = new Capabilities();
+        capabilities.putIfAbsent(WarpScriptStack.CAPABILITY_DEBUG, "");
+        Capabilities.set(stack, capabilities);
         stack.maxLimits();
 
         stack.push(token);
@@ -189,6 +206,12 @@ public class Tokens {
         }
       } catch (Throwable t) {
         LOG.error("Error during script based read token retrieval", t);
+      } finally {
+        if (null == x) {
+          WarpConfig.removeThreadProperty(IN_TOKEN_SCRIPT);
+        } else {
+          WarpConfig.setThreadProperty(IN_TOKEN_SCRIPT, x);
+        }
       }
     }
 
@@ -234,8 +257,21 @@ public class Tokens {
   private static WriteToken getWriteToken(String token) {
 
     if (null != tokenScript) {
+      Object x = WarpConfig.getThreadProperty(IN_TOKEN_SCRIPT);
       try {
+        // Ensure tokenScript is not called recursively
+        if (Boolean.TRUE.equals(WarpConfig.getThreadProperty(IN_TOKEN_SCRIPT))) {
+          LOG.error("Recursive token script call.");
+          return null;
+        }
+
+        WarpConfig.setThreadProperty(IN_TOKEN_SCRIPT, Boolean.TRUE);
+
         MemoryWarpScriptStack stack = new MemoryWarpScriptStack(null,null);
+        // The debug capability is injected to allow the token macro to output log messages
+        Capabilities capabilities = new Capabilities();
+        capabilities.putIfAbsent(WarpScriptStack.CAPABILITY_DEBUG, "");
+        Capabilities.set(stack, capabilities);
         stack.maxLimits();
 
         stack.push(token);
@@ -251,6 +287,12 @@ public class Tokens {
         }
       } catch (Throwable t) {
         LOG.error("Error during script based write token retrieval", t);
+      } finally {
+        if (null == x) {
+          WarpConfig.removeThreadProperty(IN_TOKEN_SCRIPT);
+        } else {
+          WarpConfig.setThreadProperty(IN_TOKEN_SCRIPT, x);
+        }
       }
     }
 
